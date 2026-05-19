@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --emerald:#004d40;
+  --gold:#cfa84b;
+  --ivory:#fffaf0;
+  --beige:#efe6dd;
+  --wood:#8b5e3c;
+  color-scheme: light;
+}
+
+.dark{
+  color-scheme: dark;
+}
+
+html,body,#__next{height:100%}
+body{
+  background: radial-gradient(circle at top left, rgba(207,168,75,0.12), transparent 24%),
+    linear-gradient(180deg, rgba(255,250,240,1) 0%, rgba(239,230,221,1) 65%, rgba(0,77,64,0.02) 100%);
+  color:#1f2937;
+  font-family:Inter,ui-sans-serif,system-ui;
+  overflow-x:hidden;
+}
+
+*{
+  scroll-behavior:smooth;
+}
+
+button, input, textarea, select{font:inherit}
+
+.font-serif{font-family:Merriweather,serif}
+.text-emerald{color:var(--emerald)}
+.bg-emerald{background:var(--emerald)}
+.text-gold{color:var(--gold)}
+.bg-gold{background:var(--gold)}
+.bg-ivory{background:var(--ivory)}
+
+.glass-panel{background:rgba(255,250,240,0.78);backdrop-filter:blur(20px);border:1px solid rgba(207,168,75,0.18)}
+.bg-pattern{background-image:radial-gradient(circle at top left, rgba(207,168,75,0.2), transparent 18%), radial-gradient(circle at bottom right, rgba(0,77,64,0.14), transparent 22%)}
+
+section{position:relative}
+
+.site-watermark::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background-image:url('/images/stamp-logo.jpeg');
+  background-repeat:no-repeat;
+  background-position:center top 10%;
+  background-size:32rem;
+  opacity:0.12;
+  filter:blur(0px);
+  pointer-events:none;
+  z-index:-1;
+}
+
+@media (max-width: 1024px) {
+  .site-watermark::before{
+    background-size:28rem;
+    opacity:0.08;
+  }
+}
+
+.hero-deco::before{content:'';position:absolute;top:1rem;right:2rem;width:120px;height:120px;border-radius:9999px;border:1px solid rgba(207,168,75,0.25);filter:blur(1px);}
+
+@media (max-width: 768px) {
+  .hero-deco::before{display:none}
+}

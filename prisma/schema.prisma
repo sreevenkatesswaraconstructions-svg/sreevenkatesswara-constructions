@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and role-based access
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(ADMIN)
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  EMPLOYEE
+  CLIENT
+}
+
+// Enquiry model for customer enquiries
+model Enquiry {
+  id          String        @id @default(cuid())
+  customerName String
+  phone       String
+  email       String
+  service     String
+  budget      String?
+  location    String?
+  message     String
+  status      EnquiryStatus @default(PENDING)
+  isContacted Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum EnquiryStatus {
+  PENDING
+  CONTACTED
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+}
+
+// Project model for project management
+model Project {
+  id             String        @id @default(cuid())
+  title          String
+  description    String
+  category       String
+  status         ProjectStatus @default(ONGOING)
+  images         String[]
+  videos         String[]
+  location       String
+  completionDate DateTime?
+  clientName     String?
+  featured       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([featured])
+}
+
+enum ProjectStatus {
+  ONGOING
+  COMPLETED
+  UPCOMING
+}
+
+// Blog model for CMS-style blog management
+model Blog {
+  id             String   @id @default(cuid())
+  title          String
+  slug           String   @unique
+  content        String
+  category       String
+  tags           String[]
+  featuredImage  String
+  metaTitle      String?
+  metaDescription String?
+  published      Boolean  @default(false)
+  scheduledAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([slug])
+  @@index([published])
+  @@index([category])
+}
+
+// Service model for services management
+model Service {
+  id          String   @id @default(cuid())
+  serviceName String
+  description String
+  slug        String   @unique
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+// Analytics model for visitor tracking
+model Analytics {
+  id        String   @id @default(cuid())
+  page      String
+  visits    Int      @default(0)
+  date      DateTime @default(now())
+
+  @@index([page])
+  @@index([date])
+}
+
+// Settings model for site configuration
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
