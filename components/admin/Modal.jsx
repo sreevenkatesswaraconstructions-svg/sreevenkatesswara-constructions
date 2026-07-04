@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 export default function Modal({
   isOpen,
@@ -9,6 +10,13 @@ export default function Modal({
   size = 'md',
   showCloseButton = true
 }) {
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [isOpen]);
   const sizeClasses = {
     sm: 'max-w-md',
     md: 'max-w-2xl',
@@ -37,11 +45,11 @@ export default function Modal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`w-full ${sizeClasses[size]} bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden`}
+              className={`w-full ${sizeClasses[size]} bg-white dark:bg-gray-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]`}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{title}</h2>
                 {showCloseButton && (
                   <button
@@ -54,7 +62,7 @@ export default function Modal({
               </div>
 
               {/* Content */}
-              <div className="p-6">{children}</div>
+              <div ref={contentRef} className="p-6 overflow-y-auto flex-1">{children}</div>
             </motion.div>
           </div>
         </>

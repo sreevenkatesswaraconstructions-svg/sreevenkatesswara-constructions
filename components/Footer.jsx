@@ -8,7 +8,6 @@ export default function Footer(){
             <img src="/images/logo.jpeg" alt="Sree Venkatesswara logo" className="w-20 h-20 object-contain border border-gold/30 bg-white p-2" />
             <div>
               <p className="text-sm uppercase tracking-[0.28em] text-beige/80">Sree Venkatesswara</p>
-              <p className="font-serif text-lg text-white">Constructions & Interiors</p>
             </div>
           </div>
           <p className="text-sm text-beige/80">Luxury construction and interior design for homes, villas and commercial spaces, anywhere.</p>

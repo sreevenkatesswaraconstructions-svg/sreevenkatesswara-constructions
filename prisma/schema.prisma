@@ -6,125 +6,137 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 // User model for authentication and role-based access
 model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          String    @default("ADMIN")
+  phone         String?
+  emailVerified Boolean   @default(false)
+  otpCode       String?
+  otpExpiry     DateTime?
+  profileImage  String?
+  companyName   String?
+  designation   String?
+  lastLogin     DateTime?
+  accountStatus String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+}
+
+// OTPVerification model for storing OTPs during registration
+model OTPVerification {
   id        String   @id @default(cuid())
-  name      String
   email     String   @unique
-  password  String
-  role      UserRole @default(ADMIN)
-  phone     String?
+  otpCode   String
+  otpExpiry DateTime
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
 }
 
-enum UserRole {
-  SUPER_ADMIN
-  ADMIN
-  EMPLOYEE
-  CLIENT
-}
-
 // Enquiry model for customer enquiries
 model Enquiry {
-  id          String        @id @default(cuid())
+  id           String   @id @default(cuid())
   customerName String
-  phone       String
-  email       String
-  service     String
-  budget      String?
-  location    String?
-  message     String
-  status      EnquiryStatus @default(PENDING)
-  isContacted Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  phone        String
+  email        String
+  service      String
+  budget       String?
+  location     String?
+  message      String
+  status       String   @default("NEW")
+  isContacted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([status])
   @@index([createdAt])
 }
 
-enum EnquiryStatus {
-  PENDING
-  CONTACTED
-  IN_PROGRESS
-  COMPLETED
-  CLOSED
-}
-
 // Project model for project management
 model Project {
-  id             String        @id @default(cuid())
-  title          String
-  description    String
-  category       String
-  status         ProjectStatus @default(ONGOING)
-  images         String[]
-  videos         String[]
-  location       String
+  id          String @id @default(cuid())
+  title       String
+  description String
+  category    String
+  status      String @default("ONGOING")
+
+  images String?
+  videos String?
+
+  location String?
+
   completionDate DateTime?
   clientName     String?
-  featured       Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
 
-  @@index([status])
-  @@index([category])
-  @@index([featured])
-}
+  featured Boolean @default(false)
 
-enum ProjectStatus {
-  ONGOING
-  COMPLETED
-  UPCOMING
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Blog model for CMS-style blog management
 model Blog {
-  id             String   @id @default(cuid())
-  title          String
-  slug           String   @unique
-  content        String
-  category       String
-  tags           String[]
-  featuredImage  String
-  metaTitle      String?
+  id              String    @id @default(cuid())
+  title           String
+  slug            String    @unique
+  content         String
+  excerpt         String?
+  author          String    @default("Admin")
+  category        String
+  tags            String?
+  featuredImage   String?
+  metaTitle       String?
   metaDescription String?
-  published      Boolean  @default(false)
-  scheduledAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  published       Boolean   @default(false)
+  featured        Boolean   @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([slug])
   @@index([published])
   @@index([category])
+  @@index([featured])
 }
 
 // Service model for services management
 model Service {
-  id          String   @id @default(cuid())
-  serviceName String
-  description String
-  slug        String   @unique
-  image       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  serviceName         String
+  slug                String   @unique
+  shortDescription    String?
+  detailedDescription String?
+  image               String?
+  status              String   @default("ACTIVE")
+  featured            Boolean  @default(false)
+  seoTitle            String?
+  seoDescription      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@index([slug])
+  @@index([status])
+  @@index([featured])
 }
 
 // Analytics model for visitor tracking
 model Analytics {
-  id        String   @id @default(cuid())
-  page      String
-  visits    Int      @default(0)
-  date      DateTime @default(now())
+  id     String   @id @default(cuid())
+  page   String
+  visits Int      @default(0)
+  date   DateTime @default(now())
 
   @@index([page])
   @@index([date])
@@ -139,4 +151,210 @@ model Settings {
   updatedAt DateTime @updatedAt
 
   @@index([key])
+}
+
+// EmailLog model for tracking email activity
+model EmailLog {
+  id        String   @id @default(cuid())
+  toEmail   String
+  subject   String
+  type      String // 'customer_acknowledgement', 'admin_notification', 'otp', etc.
+  status    String // 'sent', 'failed', 'pending'
+  error     String?
+  enquiryId String?
+  metadata  String? // JSON string for additional data
+  createdAt DateTime @default(now())
+
+  @@index([toEmail])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Quotation model for admin quotations
+model Quotation {
+  id                String   @id @default(cuid())
+  quotationNumber   String   @unique
+  customerName      String
+  customerPhone     String
+  customerEmail     String
+  siteAddress       String
+  city              String?
+  state             String?
+  pincode           String?
+  referenceBy       String?
+  projectName       String
+  projectType       String
+  projectLocation   String?
+  plotArea          String?
+  builtUpArea       String?
+  floors            Int?
+  estimatedDuration String?
+  status            String   @default("Draft")
+  services          String?
+  boq               String?
+  paymentSchedule   String?
+  terms             String?
+  notes             String?
+  attachments       String?
+  subtotal          Float?   @default(0)
+  gstTotal          Float?   @default(0)
+  discount          Float?   @default(0)
+  grandTotal        Float?   @default(0)
+  isDraft           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Structured relations (new) — kept additive to avoid breaking existing JSON usage
+  items           QuotationItem[]
+  materials       QuotationMaterial[]
+  paymentStages   QuotationPaymentStage[]
+  warranties      QuotationWarranty[]
+  termsList       QuotationTerm[]
+  attachmentsList QuotationAttachment[]
+  histories       QuotationHistory[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Detailed items for BOQ (structured)
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  quotationId String
+  sno         Int?
+  description String
+  quantity    Float     @default(0)
+  unit        String?
+  rate        Float     @default(0)
+  gst         Float     @default(0)
+  discount    Float     @default(0)
+  amount      Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([quotationId])
+}
+
+model QuotationMaterial {
+  id            String    @id @default(cuid())
+  quotation     Quotation @relation(fields: [quotationId], references: [id])
+  quotationId   String
+  material      String
+  brand         String?
+  specification String?
+  quantity      Float?    @default(0)
+  unit          String?
+  remarks       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([quotationId])
+}
+
+model QuotationTerm {
+  id          String    @id @default(cuid())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  quotationId String
+  order       Int?
+  text        String
+  createdAt   DateTime  @default(now())
+
+  @@index([quotationId])
+}
+
+model QuotationAttachment {
+  id           String    @id @default(cuid())
+  quotation    Quotation @relation(fields: [quotationId], references: [id])
+  quotationId  String
+  fileName     String
+  originalName String?
+  fileUrl      String
+  mimeType     String?
+  fileSize     Int?
+  createdAt    DateTime  @default(now())
+
+  @@index([quotationId])
+}
+
+model QuotationPaymentStage {
+  id          String    @id @default(cuid())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  quotationId String
+  order       Int?
+  title       String
+  percent     Float     @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([quotationId])
+}
+
+model QuotationWarranty {
+  id          String    @id @default(cuid())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  quotationId String
+  years       Int?
+  description String
+  createdAt   DateTime  @default(now())
+
+  @@index([quotationId])
+}
+
+model QuotationHistory {
+  id          String    @id @default(cuid())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  quotationId String
+  adminName   String?
+  action      String
+  meta        String?
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([quotationId])
+  @@index([action])
+}
+
+// Media model for file uploads
+model Media {
+  id           String   @id @default(cuid())
+  fileName     String
+  originalName String
+  fileType     String // 'image' or 'video'
+  mimeType     String
+  fileSize     Int
+  fileUrl      String
+  uploadedAt   DateTime @default(now())
+
+  @@index([fileType])
+  @@index([uploadedAt])
+}
+
+// Notification model for admin notifications
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String // 'success', 'warning', 'info', 'error'
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ActivityLog model for tracking admin actions
+model ActivityLog {
+  id        String   @id @default(cuid())
+  adminName String
+  action    String
+  module    String
+  ipAddress String?
+  browser   String?
+  createdAt DateTime @default(now())
+
+  @@index([module])
+  @@index([createdAt])
+  @@index([adminName])
 }

@@ -209,9 +209,7 @@ export default function Table({
                 ))}
                 {actions && (
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                      <MoreVertical className="w-5 h-5 text-gray-400" />
-                    </button>
+                    {typeof actions === 'function' ? actions(row) : actions}
                   </td>
                 )}
               </motion.tr>

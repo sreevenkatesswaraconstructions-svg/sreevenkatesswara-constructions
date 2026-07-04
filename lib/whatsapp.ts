@@ -167,6 +167,7 @@ Please respond to the customer promptly.
 // Customer greeting message template
 export function getCustomerGreetingMessage(data: {
   customerName: string;
+  customerPhone: string;
   serviceRequested: string;
   enquiryId?: string;
 }): WhatsAppMessage {
@@ -197,6 +198,7 @@ Building Dreams, Creating Spaces
 // Quote follow-up message template
 export function getQuoteFollowUpMessage(data: {
   customerName: string;
+  customerPhone: string;
   projectType: string;
   quoteId: string;
   estimatedPrice?: string;

@@ -16,13 +16,52 @@ const colorClasses = {
   blue: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200',
 };
 
-export default function Toast({ toasts, removeToast }) {
+export default function Toast({ toasts, removeToast, type, message, onClose }) {
   if (typeof window === 'undefined') return null;
+
+  // Handle legacy single toast API (type, message, onClose)
+  if (type && message) {
+    const config = toastConfig[type];
+    const Icon = config.icon;
+    const colors = colorClasses[config.color];
+
+    return createPortal(
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, x: 100, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 100, scale: 0.9 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className={`flex items-start gap-3 p-4 rounded-lg border shadow-lg ${colors} min-w-[300px] max-w-md`}
+          >
+            <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-medium">{type.charAt(0).toUpperCase() + type.slice(1)}</p>
+              <p className="text-sm mt-1 opacity-90">{message}</p>
+            </div>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex-shrink-0 hover:opacity-70 transition-opacity"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>,
+      document.body
+    );
+  }
+
+  // Handle new array-based API (toasts array)
+  const toastsArray = Array.isArray(toasts) ? toasts : [];
 
   return createPortal(
     <div className="fixed top-4 right-4 z-50 space-y-2">
       <AnimatePresence>
-        {toasts.map((toast) => {
+        {toastsArray.map((toast) => {
           const config = toastConfig[toast.type];
           const Icon = config.icon;
           const colors = colorClasses[config.color];
@@ -41,12 +80,14 @@ export default function Toast({ toasts, removeToast }) {
                 <p className="font-medium">{toast.title}</p>
                 {toast.message && <p className="text-sm mt-1 opacity-90">{toast.message}</p>}
               </div>
-              <button
-                onClick={() => removeToast(toast.id)}
-                className="flex-shrink-0 hover:opacity-70 transition-opacity"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {removeToast && (
+                <button
+                  onClick={() => removeToast(toast.id)}
+                  className="flex-shrink-0 hover:opacity-70 transition-opacity"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </motion.div>
           );
         })}

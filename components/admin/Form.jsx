@@ -1,10 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
-export default function Form({ fields, onSubmit, initialValues = {}, submitText = 'Submit' }) {
+export default function Form({ fields, onSubmit, initialValues = {}, submitText = 'Submit', onFormDataChange }) {
   const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isInitialized = useRef(false);
+
+  // Update formData when initialValues change (for edit mode), but only on first load or when key changes
+  useEffect(() => {
+    if (!isInitialized.current) {
+      setFormData(initialValues);
+      isInitialized.current = true;
+    }
+  }, [initialValues]);
+
+  // Notify parent of formData changes for external components like MediaPicker
+  useEffect(() => {
+    if (onFormDataChange) {
+      onFormDataChange(formData);
+    }
+  }, [formData, onFormDataChange]);
 
   const handleChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -60,7 +76,13 @@ export default function Form({ fields, onSubmit, initialValues = {}, submitText 
             <input
               type={field.type}
               value={formData[field.name] || ''}
-              onChange={(e) => handleChange(field.name, e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                handleChange(field.name, value);
+                if (field.onChange) {
+                  field.onChange(value, formData, handleChange);
+                }
+              }}
               placeholder={field.placeholder}
               className={`w-full px-4 py-3 rounded-lg border ${
                 errors[field.name]
@@ -121,15 +143,26 @@ export default function Form({ fields, onSubmit, initialValues = {}, submitText 
                 className="hidden"
                 id={field.name}
                 disabled={isSubmitting}
+                accept="image/*"
               />
               <label
                 htmlFor={field.name}
                 className="cursor-pointer text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400"
               >
                 {formData[field.name] ? (
-                  <span className="text-emerald-600 dark:text-emerald-400">
-                    {formData[field.name].name}
-                  </span>
+                  <div className="space-y-2">
+                    {typeof formData[field.name] === 'string' ? (
+                      <img
+                        src={formData[field.name]}
+                        alt="Preview"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {formData[field.name].name}
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   <>
                     <p className="font-medium">Click to upload</p>
@@ -138,8 +171,21 @@ export default function Form({ fields, onSubmit, initialValues = {}, submitText 
                 )}
               </label>
             </div>
+          ) : field.type === 'richtext' ? (
+            <div>
+              {field.render ? (
+                field.render(formData, handleChange, isSubmitting)
+              ) : null}
+            </div>
+          ) : field.type === 'custom' && field.render ? (
+            <div>{field.render(formData, handleChange, isSubmitting)}</div>
           ) : null}
 
+          {field.helpText && (
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {field.helpText}
+            </p>
+          )}
           {errors[field.name] && (
             <motion.p
               initial={{ opacity: 0, y: -10 }}

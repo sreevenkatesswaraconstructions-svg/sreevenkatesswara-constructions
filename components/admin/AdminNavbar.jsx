@@ -1,17 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import { Menu, Search, Bell, User, LogOut } from 'lucide-react';
+import { Menu, Search, User, LogOut, Settings, Clock, Shield, FileText } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 export default function AdminNavbar({ onMenuClick, sidebarOpen, darkMode, setDarkMode }) {
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
-  const notifications = [
-    { id: 1, message: 'New enquiry received', time: '2 min ago', unread: true },
-    { id: 2, message: 'Project status updated', time: '1 hour ago', unread: true },
-    { id: 3, message: 'Blog post published', time: '3 hours ago', unread: false },
-  ];
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchUserProfile();
+    }
+  }, [session]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const res = await fetch('/api/admin/profile');
+      const data = await res.json();
+      if (data.success) {
+        setUserProfile(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to log logout:', error);
+    }
+
+    await signOut({ callbackUrl: '/svci-admin-secure-login' });
+  };
+
+  const getRelativeTime = (date) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = now - new Date(date);
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
+
+  const getInitials = (name) => {
+    if (!name) return 'A';
+    return name.charAt(0).toUpperCase();
+  };
 
   return (
     <motion.header
@@ -46,51 +90,29 @@ export default function AdminNavbar({ onMenuClick, sidebarOpen, darkMode, setDar
         {/* Right side */}
         <div className="flex items-center gap-4">
           {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors relative"
-            >
-              <Bell className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-              {notifications.some(n => n.unread) && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              )}
-            </button>
-
-            {showNotifications && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
-              >
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
-                        notification.unread ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
-                      }`}
-                    >
-                      <p className="text-sm text-gray-900 dark:text-white">{notification.message}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{notification.time}</p>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </div>
+          <NotificationBell />
 
           {/* User Menu */}
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="group flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
             >
-              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
+              <div className="relative">
+                {userProfile?.profileImage ? (
+                  <img
+                    src={userProfile.profileImage}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm transition-transform duration-200 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-900 via-slate-700 to-slate-500 text-white flex items-center justify-center border-2 border-white shadow-sm transition-transform duration-200 group-hover:scale-105">
+                    <span className="text-sm font-semibold">
+                      {getInitials(userProfile?.name || session?.user?.name)}
+                    </span>
+                  </div>
+                )}
+                <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-white bg-emerald-400 shadow-lg animate-pulse" />
               </div>
             </button>
 
@@ -98,14 +120,100 @@ export default function AdminNavbar({ onMenuClick, sidebarOpen, darkMode, setDar
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50"
               >
+                {/* Profile Header */}
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <p className="font-medium text-gray-900 dark:text-white">Admin User</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">admin@sreevenkatesswara.com</p>
+                  <div className="flex items-center gap-3">
+                    {userProfile?.profileImage ? (
+                      <img
+                        src={userProfile.profileImage}
+                        alt="Profile"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-emerald-600 rounded-full flex items-center justify-center border-2 border-emerald-500">
+                        <span className="text-white font-semibold">
+                          {getInitials(userProfile?.name || session?.user?.name)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-white truncate">
+                        {userProfile?.name || session?.user?.name || 'Admin User'}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {userProfile?.email || session?.user?.email}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full">
+                          {userProfile?.role || session?.user?.role || 'ADMIN'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          userProfile?.accountStatus === 'ACTIVE'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>
+                          {userProfile?.accountStatus || 'ACTIVE'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <Clock className="w-3 h-3" />
+                      <span>Last login: {getRelativeTime(userProfile?.lastLogin)}</span>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Dropdown Options */}
                 <div className="p-2">
-                  <button className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <button
+                    onClick={() => {
+                      window.location.href = '/admin/profile'
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>My Profile</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.location.href = '/admin/settings'
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Account Settings</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.location.href = '/admin/change-password'
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Change Password</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.location.href = '/admin/activity-log'
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Activity Log</span>
+                  </button>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
                     <LogOut className="w-4 h-4" />
                     <span>Logout</span>
                   </button>

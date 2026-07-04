@@ -17,10 +17,12 @@ import {
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
   { name: 'Enquiries', icon: MessageSquare, path: '/admin/enquiries' },
+  { name: 'Quotations', icon: FileText, path: '/admin/quotations' },
   { name: 'Projects', icon: FolderKanban, path: '/admin/projects' },
   { name: 'Blogs', icon: FileText, path: '/admin/blogs' },
   { name: 'Services', icon: Building2, path: '/admin/services' },
   { name: 'Upload Manager', icon: Upload, path: '/admin/uploads' },
+  { name: 'Activity Log', icon: FileText, path: '/admin/activity-log' },
   { name: 'Settings', icon: Settings, path: '/admin/settings' },
 ];
 

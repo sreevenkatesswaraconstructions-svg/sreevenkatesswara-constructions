@@ -29,13 +29,15 @@ export default function Navbar(){
           <img src="/images/logo.jpeg" alt="Sree Venkatesswara logo" className="w-12 h-12 object-contain border border-gold/30 bg-white p-1" />
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-gray-600">Sree Venkatesswara</p>
-            <p className="font-serif text-xl text-emerald">Constructions & Interiors</p>
+            <p className="text-[11px] uppercase tracking-[0.32em] text-gray-500 mt-1">Constructions & Interiors</p>
           </div>
-        </Link>
+          </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm text-gray-700">
           {navLinks.map(link => (
-            <Link key={link.href} href={link.href} className="relative transition text-gray-800 hover:text-emerald after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:w-0 after:bg-gold after:transition-all hover:after:w-full">{link.label}</Link>
+            <Link key={link.href} href={link.href} className="relative transition text-gray-800 hover:text-emerald after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:w-0 after:bg-gold after:transition-all hover:after:w-full">
+              {link.label}
+            </Link>
           ))}
         </nav>
 

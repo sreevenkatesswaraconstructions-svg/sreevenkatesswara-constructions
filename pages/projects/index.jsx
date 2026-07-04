@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import SEO from '../../components/SEO'
 import ProjectCard from '../../components/ProjectCard'
-import projects from '../../data/projects'
+import { prisma } from '../../lib/prisma'
 
 const categories = ['All', 'Residential', 'Commercial', 'Interiors', 'Villas']
 
-export default function Projects(){
+export default function Projects({ projects }) {
   const [active, setActive] = useState('All')
-  const filtered = useMemo(() => active === 'All' ? projects : projects.filter(project => project.category === active), [active])
+  const filtered = useMemo(() => active === 'All' ? projects : projects.filter(project => project.category === active), [active, projects])
 
   return (
     <main className="max-w-7xl mx-auto px-6 py-20 space-y-16">
@@ -32,4 +32,26 @@ export default function Projects(){
       </section>
     </main>
   )
+}
+
+export async function getServerSideProps() {
+  try {
+    console.log('[PUBLIC PROJECTS] Fetching projects from database...');
+    const projects = await prisma.project.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    console.log('[PUBLIC PROJECTS] Fetched', projects.length, 'projects');
+    return {
+      props: {
+        projects: JSON.parse(JSON.stringify(projects)),
+      },
+    };
+  } catch (error) {
+    console.error('[PUBLIC PROJECTS] Error fetching projects:', error);
+    return {
+      props: {
+        projects: [],
+      },
+    };
+  }
 }

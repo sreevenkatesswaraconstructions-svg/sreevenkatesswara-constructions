@@ -1,23 +1,19 @@
 import { prisma } from '../../../lib/prisma'
 import { NextApiRequest, NextApiResponse } from 'next'
+import { createNotification } from '../../../lib/notifications'
+import { logActivity } from '../../../lib/activityLog'
 
-// Allowed service names
-const ALLOWED_SERVICES = [
-  'Construction',
-  'Interiors',
-  'Renovation',
-  'Civil Works',
-  'Plumbing',
-  'Electrical',
-  'Painting',
-  'Carpentry'
-]
+const response = (success: boolean, data: any = null, message: string = '') => ({
+  success,
+  data,
+  message
+})
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query
 
   if (typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid ID' })
+    return res.status(400).json(response(false, null, 'Invalid ID'))
   }
 
   if (req.method === 'GET') {
@@ -27,117 +23,141 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
 
       if (!service) {
-        return res.status(404).json({ error: 'Service not found' })
+        return res.status(404).json(response(false, null, 'Service not found'))
       }
 
-      return res.status(200).json(service)
+      return res.status(200).json(response(true, service))
     } catch (error) {
-      console.error('Error fetching service:', error)
-      return res.status(500).json({ error: 'Failed to fetch service' })
+      console.error('[SERVICES API] Error fetching service:', error)
+      return res.status(500).json(response(false, null, 'Failed to fetch service'))
     }
   }
 
   if (req.method === 'PUT') {
     try {
-      const { serviceName, description, image } = req.body
+      const {
+        serviceName,
+        slug,
+        shortDescription,
+        detailedDescription,
+        image,
+        status,
+        featured,
+        seoTitle,
+        seoDescription
+      } = req.body
 
-      // Validate service name if provided
-      if (serviceName && !ALLOWED_SERVICES.includes(serviceName)) {
-        return res.status(400).json({ 
-          error: 'Invalid service name. Allowed services: ' + ALLOWED_SERVICES.join(', ') 
-        })
-      }
-
-      // Check if service exists
       const existingService = await prisma.service.findUnique({
         where: { id }
       })
 
       if (!existingService) {
-        return res.status(404).json({ error: 'Service not found' })
+        return res.status(404).json(response(false, null, 'Service not found'))
       }
 
-      // If serviceName is being updated, check for slug conflicts
-      if (serviceName && serviceName !== existingService.serviceName) {
-        const newSlug = serviceName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')
-        
+      if (serviceName !== undefined && (typeof serviceName !== 'string' || serviceName.trim().length === 0)) {
+        return res.status(400).json(response(false, null, 'Service name is required'))
+      }
+
+      if (slug !== undefined && (typeof slug !== 'string' || slug.trim().length === 0)) {
+        return res.status(400).json(response(false, null, 'Slug is required'))
+      }
+
+      if (slug && slug.trim() !== existingService.slug) {
         const slugConflict = await prisma.service.findFirst({
           where: {
-            slug: newSlug,
+            slug: slug.trim(),
             id: { not: id }
           }
         })
 
         if (slugConflict) {
-          return res.status(409).json({ error: 'Service with this name already exists' })
+          return res.status(409).json(response(false, null, 'Service with this slug already exists'))
         }
-
-        // Update with new slug
-        const service = await prisma.service.update({
-          where: { id },
-          data: {
-            serviceName,
-            description: description || existingService.description,
-            slug: newSlug,
-            ...(image !== undefined && { image })
-          }
-        })
-
-        return res.status(200).json(service)
       }
 
-      // Update without changing serviceName/slug
+      const updateData: any = {}
+      if (serviceName !== undefined) updateData.serviceName = serviceName.trim()
+      if (slug !== undefined) updateData.slug = slug.trim()
+      if (shortDescription !== undefined) updateData.shortDescription = shortDescription || null
+      if (detailedDescription !== undefined) updateData.detailedDescription = detailedDescription || null
+      if (image !== undefined) updateData.image = image || null
+      if (status !== undefined) updateData.status = status
+      if (featured !== undefined) updateData.featured = featured
+      if (seoTitle !== undefined) updateData.seoTitle = seoTitle || null
+      if (seoDescription !== undefined) updateData.seoDescription = seoDescription || null
+
       const service = await prisma.service.update({
         where: { id },
-        data: {
-          ...(serviceName && { serviceName }),
-          ...(description && { description }),
-          ...(image !== undefined && { image })
-        }
+        data: updateData
       })
 
-      return res.status(200).json(service)
-    } catch (error) {
-      console.error('Error updating service:', error)
-      
-      // Handle Prisma-specific errors
-      if (error instanceof Error && error.message.includes('Record to update not found')) {
-        return res.status(404).json({ error: 'Service not found' })
-      }
+      // Create notification
+      await createNotification({
+        title: 'Service Updated',
+        message: `Service "${service.serviceName}" has been updated`,
+        type: 'info',
+        link: '/admin/services'
+      })
 
-      return res.status(500).json({ error: 'Failed to update service' })
+      // Log activity
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || null
+      const browser = req.headers['user-agent'] || null
+      await logActivity({
+        adminName: 'Admin',
+        action: 'Updated Service',
+        module: 'Service',
+        ipAddress: ipAddress as string,
+        browser: browser as string
+      })
+
+      return res.status(200).json(response(true, service, 'Service updated successfully'))
+    } catch (error) {
+      console.error('[SERVICES API] Error updating service:', error)
+      return res.status(500).json(response(false, null, 'Failed to update service'))
     }
   }
 
   if (req.method === 'DELETE') {
     try {
-      // Check if service exists
       const service = await prisma.service.findUnique({
         where: { id }
       })
 
       if (!service) {
-        return res.status(404).json({ error: 'Service not found' })
+        return res.status(404).json(response(false, null, 'Service not found'))
       }
 
-      // Delete service
       await prisma.service.delete({
         where: { id }
       })
 
-      return res.status(200).json({ message: 'Service deleted successfully' })
-    } catch (error) {
-      console.error('Error deleting service:', error)
-      
-      // Handle Prisma-specific errors
-      if (error instanceof Error && error.message.includes('Record to delete does not exist')) {
-        return res.status(404).json({ error: 'Service not found' })
-      }
+      // Create notification
+      await createNotification({
+        title: 'Service Deleted',
+        message: `Service "${service.serviceName}" has been deleted`,
+        type: 'warning',
+        link: '/admin/services'
+      })
 
-      return res.status(500).json({ error: 'Failed to delete service' })
+      // Log activity
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || null
+      const browser = req.headers['user-agent'] || null
+      await logActivity({
+        adminName: 'Admin',
+        action: 'Deleted Service',
+        module: 'Service',
+        ipAddress: ipAddress as string,
+        browser: browser as string
+      })
+
+      return res.status(200).json(response(true, null, 'Service deleted successfully'))
+    } catch (error) {
+      console.error('[SERVICES API] Error deleting service:', error)
+      return res.status(500).json(response(false, null, 'Failed to delete service'))
     }
   }
 
   res.setHeader('Allow', ['GET', 'PUT', 'DELETE'])
-  return res.status(405).json({ error: 'Method not allowed' })
+  return res.status(405).json(response(false, null, 'Method not allowed'))
 }

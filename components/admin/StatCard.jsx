@@ -5,6 +5,7 @@ import {
   CheckCircle,
   FileText,
   Users,
+  Settings,
   TrendingUp,
   TrendingDown
 } from 'lucide-react';
@@ -15,6 +16,7 @@ const iconMap = {
   CheckCircle,
   FileText,
   Users,
+  Settings,
 };
 
 const colorMap = {

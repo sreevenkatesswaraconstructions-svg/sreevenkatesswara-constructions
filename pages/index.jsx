@@ -3,6 +3,7 @@ import Hero from '../components/Hero'
 import ServiceCard from '../components/ServiceCard'
 import ProjectCard from '../components/ProjectCard'
 import TestimonialCard from '../components/TestimonialCard'
+import ClickableImage from '../components/ClickableImage'
 import projects from '../data/projects'
 import Link from 'next/link'
 
@@ -85,16 +86,28 @@ export default function Home(){
             </div>
           </div>
           <div className="space-y-6">
-            <div className="h-[360px] rounded-[2rem] overflow-hidden border border-emerald/10 shadow-xl">
-              <img src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80" alt="Architecture" className="h-full w-full object-cover" />
-            </div>
+            <ClickableImage
+              src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80"
+              alt="Architecture"
+              className="h-[360px]"
+              aspectRatio="aspect-video"
+              rounded="rounded-[2rem]"
+            />
             <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-[1.75rem] overflow-hidden border border-emerald/10 shadow-lg">
-                <img src="https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=800&q=80" alt="Interior design" className="h-40 w-full object-cover" />
-              </div>
-              <div className="rounded-[1.75rem] overflow-hidden border border-emerald/10 shadow-lg">
-                <img src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=800&q=80" alt="Construction" className="h-40 w-full object-cover" />
-              </div>
+              <ClickableImage
+                src="https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=800&q=80"
+                alt="Interior design"
+                className="h-40"
+                aspectRatio="aspect-video"
+                rounded="rounded-[1.75rem]"
+              />
+              <ClickableImage
+                src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=800&q=80"
+                alt="Construction"
+                className="h-40"
+                aspectRatio="aspect-video"
+                rounded="rounded-[1.75rem]"
+              />
             </div>
           </div>
         </section>

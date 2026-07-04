@@ -3,49 +3,7 @@ import StatCard from './StatCard';
 import RecentActivity from './RecentActivity';
 import QuickActions from './QuickActions';
 
-export default function DashboardOverview() {
-  const stats = [
-    {
-      title: 'Total Enquiries',
-      value: '248',
-      change: '+12%',
-      trend: 'up',
-      icon: 'MessageSquare',
-      color: 'emerald'
-    },
-    {
-      title: 'Active Projects',
-      value: '12',
-      change: '+3',
-      trend: 'up',
-      icon: 'FolderKanban',
-      color: 'blue'
-    },
-    {
-      title: 'Completed Projects',
-      value: '89',
-      change: '+5',
-      trend: 'up',
-      icon: 'CheckCircle',
-      color: 'green'
-    },
-    {
-      title: 'Blog Posts',
-      value: '34',
-      change: '+2',
-      trend: 'up',
-      icon: 'FileText',
-      color: 'purple'
-    },
-    {
-      title: 'Website Visitors',
-      value: '12.5K',
-      change: '+18%',
-      trend: 'up',
-      icon: 'Users',
-      color: 'orange'
-    },
-  ];
+export default function DashboardOverview({ stats, activities }) {
 
   return (
     <div className="space-y-6">
@@ -80,7 +38,7 @@ export default function DashboardOverview() {
           transition={{ delay: 0.5 }}
           className="lg:col-span-2"
         >
-          <RecentActivity />
+          <RecentActivity activities={activities} />
         </motion.div>
 
         {/* Quick Actions */}
