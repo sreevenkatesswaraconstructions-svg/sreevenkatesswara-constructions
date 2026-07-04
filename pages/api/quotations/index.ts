@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]'
 import { prisma } from '../../../lib/prisma'
-import { DEFAULT_QUOTATION_TERMS, DEFAULT_QUOTATION_NOTES, generateQuotationNumber, normalizeQuotationRecord, serializeQuotationPayload, validateQuotationPayload } from '../../../lib/quotations'
+import { DEFAULT_QUOTATION_TERMS, generateQuotationNumber, normalizeQuotationRecord, serializeQuotationPayload, validateQuotationPayload } from '../../../lib/quotations'
 
 const response = (success: boolean, data: any = null, message: string = '') => ({ success, data, message })
 
@@ -47,7 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const body = req.body || {}
       if (body.terms === undefined) body.terms = DEFAULT_QUOTATION_TERMS
-      if (body.notes === undefined) body.notes = DEFAULT_QUOTATION_NOTES
       if (!body.status) body.status = 'Saved'
       const validation = validateQuotationPayload(body, { allowIncompleteDraft: ['DRAFT', 'SAVED'].includes(String(body.status ?? '').trim().toUpperCase()) })
       if (!validation.isValid) {
