@@ -38,23 +38,24 @@ export default function UploadsPage() {
 
     setFilteredUploads(filtered);
   };
-
   const fetchUploads = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/upload/files');
-      const data = await response.json();
-      
+  setLoading(true);
+  try {
+    const response = await fetch('/api/upload/files');
+    const data = await response.json();
+
+    console.log("UPLOAD API RESPONSE:", data);
+
       if (data.success) {
-        setUploads(data.files);
+      setUploads(data.files);
       }
     } catch (error) {
-      console.error('Error fetching uploads:', error);
-      toast.error('Failed to fetch uploads');
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.error('Error fetching uploads:', error);
+    toast.error('Failed to fetch uploads');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDrag = (e) => {
     e.preventDefault();

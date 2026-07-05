@@ -5,6 +5,13 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { createNotification } from '../../../lib/notifications'
 import { logActivity } from '../../../lib/activityLog'
+import { v2 as cloudinary } from 'cloudinary'
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 export const config = {
   api: {
@@ -60,15 +67,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Create upload directory if it doesn't exist
     const targetDir = path.join(process.cwd(), 'public', 'uploads', uploadDir)
     await fs.mkdir(targetDir, { recursive: true })
+    //const filePath = path.join(targetDir, fileName)
+    //await fs.copyFile(file.filepath, filePath)
 
-    // Save file
-    const filePath = path.join(targetDir, fileName)
-    await fs.copyFile(file.filepath, filePath)
-    await fs.unlink(file.filepath)
+    //const exists = await fs.stat(filePath)
+    //console.log("FILE SAVED:", filePath)
+    //console.log("FILE SIZE:", exists.size)
+    //await fs.unlink(file.filepath)
 
     // Generate file URL
-    const fileUrl = `/uploads/${uploadDir}/${fileName}`
+    //const fileUrl = `/uploads/${uploadDir}/${fileName}`
+    // ===== CLOUDINARY UPLOAD =====
+    const uploadResult = await cloudinary.uploader.upload(file.filepath, {
+        folder: "sreevenkatesswara",
+        resource_type: "auto",
+    })
 
+    await fs.unlink(file.filepath)
+
+    const fileUrl = uploadResult.secure_url
+
+    console.log("Cloudinary URL:", fileUrl)
     // Save to database
     const media = await prisma.media.create({
       data: {
