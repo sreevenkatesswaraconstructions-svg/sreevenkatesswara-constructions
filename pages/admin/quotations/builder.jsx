@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminLayout from '../../../components/admin/AdminLayout'
-import { Plus, Trash2, Copy, UploadCloud, FileText, Printer, Mail, MessageSquare, Download } from 'lucide-react'
+import { Plus, Trash2, Copy, UploadCloud, FileText, Printer, Mail, MessageSquare, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { buildQuotationHtml } from '../../../lib/quotationDocument'
 import { DEFAULT_QUOTATION_TERMS, DEFAULT_QUOTATION_NOTES } from '../../../lib/quotationDefaults'
@@ -17,6 +17,9 @@ export default function QuotationBuilder({ quotationId }){
   const [currentId, setCurrentId] = useState(quotationId || null)
   const [unsaved, setUnsaved] = useState(false)
   const previewIframeRef = useRef(null)
+  
+  // New structured BOQ state for Work Blocks
+  const [workBlocks, setWorkBlocks] = useState([])
 
   // Basic helpers and stubs used by the UI and HTML generator
   function setField(key, value){ setData(prev=>({ ...prev, [key]: value })) }
@@ -30,6 +33,103 @@ export default function QuotationBuilder({ quotationId }){
   function updateTerm(idx, value){ setData(prev=>{ const t = [...(prev.terms||[])]; t[idx] = value; return { ...prev, terms: t } }) }
   function addTerm(){ setData(prev=>({ ...prev, terms: [...(prev.terms||[]), ''] })) }
   function deleteTerm(idx){ setData(prev=>{ const t = [...(prev.terms||[])]; t.splice(idx,1); return { ...prev, terms: t } }) }
+
+  // Work Block helpers
+  function addWorkBlock(){ 
+    setWorkBlocks(prev=>([...prev, { 
+      id: Date.now(), 
+      title: '', 
+      descriptions: [''], 
+      materials: [''], 
+      warranty: '', 
+      measurements: [{ id: Date.now(), description: '', unit: '', quantity: 0, rate: 0, amount: 0 }],
+      expanded: true 
+    }])) 
+  }
+  
+  function deleteWorkBlock(idx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; b.splice(idx,1); return b }) 
+  }
+  
+  function updateWorkBlock(idx, field, value){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; b[idx] = { ...b[idx], [field]: value }; return b }) 
+  }
+  
+  function toggleWorkBlock(idx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; b[idx] = { ...b[idx], expanded: !b[idx].expanded }; return b }) 
+  }
+  
+  function addDescription(workIdx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; b[workIdx] = { ...b[workIdx], descriptions: [...(b[workIdx].descriptions||[]), ''] }; return b }) 
+  }
+  
+  function updateDescription(workIdx, descIdx, value){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; const descs = [...b[workIdx].descriptions]; descs[descIdx] = value; b[workIdx] = { ...b[workIdx], descriptions: descs }; return b }) 
+  }
+  
+  function deleteDescription(workIdx, descIdx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; const descs = [...b[workIdx].descriptions]; descs.splice(descIdx,1); b[workIdx] = { ...b[workIdx], descriptions: descs }; return b }) 
+  }
+  
+  function addMaterial(workIdx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; b[workIdx] = { ...b[workIdx], materials: [...(b[workIdx].materials||[]), ''] }; return b }) 
+  }
+  
+  function updateMaterial(workIdx, matIdx, value){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; const mats = [...b[workIdx].materials]; mats[matIdx] = value; b[workIdx] = { ...b[workIdx], materials: mats }; return b }) 
+  }
+  
+  function deleteMaterial(workIdx, matIdx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; const mats = [...b[workIdx].materials]; mats.splice(matIdx,1); b[workIdx] = { ...b[workIdx], materials: mats }; return b }) 
+  }
+  
+  function addMeasurement(workIdx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; b[workIdx] = { ...b[workIdx], measurements: [...(b[workIdx].measurements||[]), { id: Date.now(), description: '', unit: '', quantity: 0, rate: 0, amount: 0 }] }; return b }) 
+  }
+  
+  function updateMeasurement(workIdx, measIdx, field, value){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; const meas = [...b[workIdx].measurements]; meas[measIdx] = { ...meas[measIdx], [field]: value }; b[workIdx] = { ...b[workIdx], measurements: meas }; return b }) 
+  }
+  
+  function deleteMeasurement(workIdx, measIdx){ 
+    setWorkBlocks(prev=>{ const b = [...prev]; const meas = [...b[workIdx].measurements]; meas.splice(measIdx,1); b[workIdx] = { ...b[workIdx], measurements: meas }; return b }) 
+  }
+
+  // Transform workBlocks to flat boq array for backend compatibility
+  function syncWorkBlocksToBoq(){
+    const flatBoq = []
+    workBlocks.forEach(block => {
+      const blockTitle = block.title || 'Untitled Work'
+      const descriptions = (block.descriptions || []).filter(d => d && d.trim()).join('; ')
+      const materials = (block.materials || []).filter(m => m && m.trim()).join('; ')
+      const warranty = block.warranty || ''
+      
+      if (block.measurements && block.measurements.length > 0) {
+        block.measurements.forEach(meas => {
+          const amount = Number(meas.quantity || 0) * Number(meas.rate || 0)
+          const fullDescription = [
+            meas.description || '',
+            descriptions ? `Description: ${descriptions}` : '',
+            materials ? `Materials: ${materials}` : '',
+            warranty ? `Warranty: ${warranty}` : ''
+          ].filter(Boolean).join(' | ')
+          
+          flatBoq.push({
+            id: meas.id || Date.now() + Math.random(),
+            description: fullDescription || blockTitle,
+            category: blockTitle,
+            unit: meas.unit || '',
+            quantity: Number(meas.quantity || 0),
+            rate: Number(meas.rate || 0),
+            gst: 0, // GST will be calculated by backend based on company settings
+            amount: amount
+          })
+        })
+      }
+    })
+    
+    setData(prev=>({ ...prev, boq: flatBoq }))
+  }
 
   function formatCurrency(n){ return Number(n||0).toFixed(2) }
   function openAttachments(){ /* stub: open attachment manager */ }
@@ -74,6 +174,11 @@ export default function QuotationBuilder({ quotationId }){
   useEffect(() => {
     computeTotals()
   }, [data.boq, data.discount])
+
+  // Sync workBlocks to boq whenever workBlocks change
+  useEffect(() => {
+    syncWorkBlocksToBoq()
+  }, [workBlocks])
 
   function getQuotationHtml(printWhenReady = false){
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
@@ -496,30 +601,160 @@ export default function QuotationBuilder({ quotationId }){
 
         <div className="bg-white p-4 rounded">
           <h3 className="font-semibold mb-2">Section 4 — Bill of Quantities (BOQ)</h3>
-          <div className={"overflow-x-auto " + (validationErrors.boq ? 'border-2 border-red-500 p-1' : '')}>
-            <table className="w-full text-sm">
-              <thead className="text-left"><tr><th>Description</th><th>Category</th><th>Unit</th><th>Qty</th><th>Rate</th><th>GST %</th><th>Amount</th><th>Actions</th></tr></thead>
-              <tbody>
-                {(data.boq||[]).map((r, idx)=> (
-                  <tr key={r.id} className="align-top border-t">
-                    <td><input value={r.description} onChange={(e)=>updateBoqRow(idx,'description', e.target.value)} className="border p-1" /></td>
-                    <td><input value={r.category} onChange={(e)=>updateBoqRow(idx,'category', e.target.value)} className="border p-1" /></td>
-                    <td><input value={r.unit} onChange={(e)=>updateBoqRow(idx,'unit', e.target.value)} className="border p-1" /></td>
-                    <td><input type="number" value={r.quantity} onChange={(e)=>updateBoqRow(idx,'quantity', Number(e.target.value))} className="border p-1 w-20" /></td>
-                    <td><input type="number" value={r.rate} onChange={(e)=>updateBoqRow(idx,'rate', Number(e.target.value))} className="border p-1 w-28" /></td>
-                    <td><input type="number" value={r.gst} onChange={(e)=>updateBoqRow(idx,'gst', Number(e.target.value))} className="border p-1 w-20" /></td>
-                    <td>{formatCurrency(r.amount)}</td>
-                    <td className="flex gap-1">
-                      <button type="button" onClick={()=>duplicateBoqRow(idx)} className="p-1 border rounded"><Copy className="w-4 h-4" /></button>
-                      <button type="button" onClick={()=>deleteBoqRow(idx)} className="p-1 border rounded text-red-600"><Trash2 className="w-4 h-4" /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button type="button" onClick={addBoqRow} className="px-3 py-1 bg-emerald-600 text-white rounded inline-flex items-center gap-2"><Plus /> Add Row</button>
+          <div className={"space-y-4 " + (validationErrors.boq ? 'border-2 border-red-500 p-1' : '')}>
+            {workBlocks.map((block, workIdx) => (
+              <div key={block.id} className="border border-gray-300 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">
+                  <div className="flex items-center gap-3 flex-1">
+                    <button type="button" onClick={()=>toggleWorkBlock(workIdx)} className="p-1 hover:bg-gray-200 rounded">
+                      {block.expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <input 
+                      value={block.title} 
+                      onChange={(e)=>updateWorkBlock(workIdx, 'title', e.target.value)} 
+                      placeholder="WORK TITLE" 
+                      className="font-semibold text-lg border-none bg-transparent focus:outline-none focus:ring-0 w-full"
+                    />
+                  </div>
+                  <button type="button" onClick={()=>deleteWorkBlock(workIdx)} className="p-2 text-red-600 hover:bg-red-50 rounded">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                {block.expanded && (
+                  <div className="p-4 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">WORK DESCRIPTION</label>
+                      <div className="space-y-2">
+                        {(block.descriptions || []).map((desc, descIdx) => (
+                          <div key={descIdx} className="flex gap-2 items-start">
+                            <span className="text-gray-500 mt-2">{String.fromCharCode(97 + descIdx)})</span>
+                            <input 
+                              value={desc} 
+                              onChange={(e)=>updateDescription(workIdx, descIdx, e.target.value)} 
+                              placeholder="Enter description point..." 
+                              className="flex-1 border p-2 rounded"
+                            />
+                            <button type="button" onClick={()=>deleteDescription(workIdx, descIdx)} className="p-2 text-red-600 hover:bg-red-50 rounded">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={()=>addDescription(workIdx)} className="px-3 py-1 bg-emerald-600 text-white rounded inline-flex items-center gap-2 text-sm">
+                          <Plus className="w-4 h-4" /> Add Description Point
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">USING MATERIAL</label>
+                      <div className="space-y-2">
+                        {(block.materials || []).map((mat, matIdx) => (
+                          <div key={matIdx} className="flex gap-2 items-start">
+                            <span className="text-gray-500 mt-2">{String.fromCharCode(97 + matIdx)})</span>
+                            <input 
+                              value={mat} 
+                              onChange={(e)=>updateMaterial(workIdx, matIdx, e.target.value)} 
+                              placeholder="Enter material..." 
+                              className="flex-1 border p-2 rounded"
+                            />
+                            <button type="button" onClick={()=>deleteMaterial(workIdx, matIdx)} className="p-2 text-red-600 hover:bg-red-50 rounded">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={()=>addMaterial(workIdx)} className="px-3 py-1 bg-emerald-600 text-white rounded inline-flex items-center gap-2 text-sm">
+                          <Plus className="w-4 h-4" /> Add Material
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">WARRANTY</label>
+                      <input 
+                        value={block.warranty} 
+                        onChange={(e)=>updateWorkBlock(workIdx, 'warranty', e.target.value)} 
+                        placeholder="e.g., Warranty for 10 Years" 
+                        className="w-full border p-2 rounded"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">MEASUREMENT</label>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="text-left bg-gray-50">
+                            <tr>
+                              <th className="p-2 border w-12">Sl.No</th>
+                              <th className="p-2 border">Description</th>
+                              <th className="p-2 border w-24">Unit</th>
+                              <th className="p-2 border w-24">Quantity</th>
+                              <th className="p-2 border w-28">Rate</th>
+                              <th className="p-2 border w-28">Amount</th>
+                              <th className="p-2 border w-12">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(block.measurements || []).map((meas, measIdx) => {
+                              const amount = Number(meas.quantity || 0) * Number(meas.rate || 0)
+                              return (
+                                <tr key={meas.id} className="border-t">
+                                  <td className="p-2 border text-center font-medium">{measIdx + 1}</td>
+                                  <td className="p-2 border">
+                                    <input 
+                                      value={meas.description} 
+                                      onChange={(e)=>updateMeasurement(workIdx, measIdx, 'description', e.target.value)} 
+                                      className="border p-1 w-full"
+                                      placeholder="Enter description..."
+                                    />
+                                  </td>
+                                  <td className="p-2 border">
+                                    <input 
+                                      value={meas.unit} 
+                                      onChange={(e)=>updateMeasurement(workIdx, measIdx, 'unit', e.target.value)} 
+                                      className="border p-1 w-full"
+                                    />
+                                  </td>
+                                  <td className="p-2 border">
+                                    <input 
+                                      type="number" 
+                                      value={meas.quantity} 
+                                      onChange={(e)=>updateMeasurement(workIdx, measIdx, 'quantity', Number(e.target.value))} 
+                                      className="border p-1 w-full"
+                                    />
+                                  </td>
+                                  <td className="p-2 border">
+                                    <input 
+                                      type="number" 
+                                      value={meas.rate} 
+                                      onChange={(e)=>updateMeasurement(workIdx, measIdx, 'rate', Number(e.target.value))} 
+                                      className="border p-1 w-full"
+                                    />
+                                  </td>
+                                  <td className="p-2 border font-medium">{formatCurrency(amount)}</td>
+                                  <td className="p-2 border text-center">
+                                    <button type="button" onClick={()=>deleteMeasurement(workIdx, measIdx)} className="p-1 border rounded text-red-600">
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <button type="button" onClick={()=>addMeasurement(workIdx)} className="mt-2 px-3 py-1 bg-emerald-600 text-white rounded inline-flex items-center gap-2 text-sm">
+                        <Plus className="w-4 h-4" /> Add Measurement Row
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            <button type="button" onClick={addWorkBlock} className="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg inline-flex items-center justify-center gap-2 font-medium">
+              <Plus className="w-5 h-5" /> Add Work
+            </button>
           </div>
 
           <div className="mt-4 space-y-1 text-sm">

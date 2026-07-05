@@ -43,6 +43,8 @@
   "devDependencies": {
     "@types/node": "25.8.0",
     "@types/react": "19.2.15",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.10",
     "ts-node": "^10.9.2",
     "typescript": "6.0.3"
   }

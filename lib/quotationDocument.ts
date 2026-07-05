@@ -98,6 +98,20 @@ const getServiceNames = (quotation: QuotationData = {}, servicesList: Array<Reco
   return []
 }
 
+const getLogoValue = (settings: Record<string, any> = {}) => {
+  const candidates = [settings.logo, settings.company_logo, settings.companyLogo, settings.logoUrl]
+  return candidates.find((value: any) => typeof value === 'string' && value.trim()) || ''
+}
+
+const getPreviewLogoUrl = (settings: Record<string, any> = {}, baseUrl = '') => {
+  const resolvedUrl = resolveUrl(getLogoValue(settings), baseUrl || '')
+  console.log('[Quotation Preview] Company Logo URL:', resolvedUrl || '(none)')
+  if (resolvedUrl && /cloudinary/i.test(resolvedUrl)) {
+    console.log('[Quotation Preview] Cloudinary URL detected for logo')
+  }
+  return resolvedUrl
+}
+
 export const buildQuotationHtml = (
   quotation: QuotationData = {},
   settings: Record<string, any> = {},
@@ -105,7 +119,7 @@ export const buildQuotationHtml = (
 ) => {
   const primaryColor = String(settings.primary_color || settings.primaryColor || '#0f766e')
   const secondaryColor = String(settings.secondary_color || settings.secondaryColor || '#166534')
-  const logoUrl = resolveUrl(settings.logo || settings.company_logo, options.baseUrl || '')
+  const logoUrl = getPreviewLogoUrl(settings, options.baseUrl || '') || '/images/logo.jpeg'
   const companyName = decodeHtmlEntities(settings.company_name || settings.companyName || '')
   const companyTagline = decodeHtmlEntities(settings.company_tagline || settings.companyTagline || 'Constructions & Interiors')
   const companyAddress = escapeHtml(
@@ -185,14 +199,14 @@ export const buildQuotationHtml = (
   }, 0)
   const computedGrandTotal = computedSubtotal + computedGstTotal - Number(quotation.discount || 0)
 
-  const boqRowsHtml = boqRows.map((row: any) => `
+  const boqRowsHtml = boqRows.map((row: any, index: number) => `
       <tr>
+        <td>${index + 1}</td>
         <td>${escapeHtml(row.description || row.item || '-')}</td>
         <td>${escapeHtml(row.category || '-')}</td>
         <td>${escapeHtml(row.unit || '-')}</td>
         <td>${escapeHtml(row.quantity || 0)}</td>
         <td>${formatCurrency(row.rate)}</td>
-        <td>${escapeHtml(row.gst || 0)}%</td>
         <td>${formatCurrency(row.amount)}</td>
       </tr>
     `).join('')
@@ -202,7 +216,7 @@ export const buildQuotationHtml = (
       <div class="section-box">
         <h4>Bill of Quantities (BOQ)</h4>
         <table class="quotation-table">
-          <thead><tr><th>Description</th><th>Category</th><th>Unit</th><th>Qty</th><th>Rate</th><th>GST %</th><th>Amount</th></tr></thead>
+          <thead><tr><th>S. No</th><th>Description</th><th>Category</th><th>Unit</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
           <tbody>${boqRowsHtml}</tbody>
         </table>
       </div>
@@ -256,11 +270,16 @@ export const buildQuotationHtml = (
   `
 
   const terms = Array.isArray(quotation.terms) ? quotation.terms : []
-  const termsSection = terms.length ? `
+  const normalizedTerms = terms
+    .map((term: any) => String(term || '').trim())
+    .filter(Boolean)
+    .map((term: string) => term.replace(/^\s*\d+[.)\-]\s*/, '').trim())
+
+  const termsSection = normalizedTerms.length ? `
     <div class="section-card">
       <div class="section-box">
         <h4>Terms & Conditions</h4>
-        <ol class="bullet-list numbered">${terms.map((term: any) => `<li>${escapeHtml(term || '')}</li>`).join('')}</ol>
+        <ol class="bullet-list numbered">${normalizedTerms.map((term: string, index: number) => `<li><span class="term-number">${index + 1}.</span><span class="term-text">${escapeHtml(term)}</span></li>`).join('')}</ol>
       </div>
     </div>
   ` : ''
@@ -313,7 +332,7 @@ export const buildQuotationHtml = (
   const headerHtml = `
     <div class="letterhead-header">
       <div class="letterhead-left">
-        ${logoUrl ? `<div class="logo"><img src="${logoUrl}" alt="${companyName || 'Company Logo'}" /></div>` : ''}
+        ${logoUrl ? `<div class="logo"><img src="${escapeHtml(logoUrl)}" alt="${companyName || 'Company Logo'}" /></div>` : ''}
         <div class="company-details">
           ${companyName ? `<div class="company-name">${companyName}</div>` : ''}
           ${companyTagline ? `<div class="company-tagline">${companyTagline}</div>` : ''}
@@ -352,8 +371,9 @@ export const buildQuotationHtml = (
         .paper { width: 210mm; margin: 0 auto; }
         .page { width: 210mm; min-height: 297mm; box-sizing: border-box; padding: 16mm 14mm 18mm; position: relative; background: white; margin: 0 0 12px; }
         .letterhead-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 1px solid ${secondaryColor}; padding-bottom: 10px; margin-bottom: 10px; }
-        .letterhead-left { display: flex; gap: 14px; align-items: flex-start; }
-        .logo img { max-width: 160px; max-height: 72px; object-fit: contain; display: block; }
+        .letterhead-left { display: flex; gap: 14px; align-items: center; }
+        .logo { display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; flex-shrink: 0; }
+        .logo img { width: 90px; height: 90px; max-width: 90px; max-height: 90px; object-fit: contain; display: block; border-radius: 50%; image-rendering: auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
         .company-details { display: grid; gap: 4px; }
         .company-name { font-size: 18px; font-weight: 800; color: ${primaryColor}; }
         .company-tagline { font-size: 13px; font-weight: 600; color: ${secondaryColor}; }
@@ -368,6 +388,10 @@ export const buildQuotationHtml = (
         .value { font-size: 12px; color: #0f172a; line-height: 1.45; }
         .bullet-list { margin: 0; padding-left: 18px; font-size: 12px; color: #0f172a; }
         .bullet-list li { margin-bottom: 4px; }
+        .bullet-list.numbered { padding-left: 0; list-style: none; }
+        .bullet-list.numbered li { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+        .bullet-list.numbered .term-number { flex: 0 0 20px; font-size: 12px; font-weight: 700; text-align: right; line-height: 1.45; color: #0f172a; }
+        .bullet-list.numbered .term-text { flex: 1 1 0; min-width: 0; line-height: 1.45; }
         .quotation-table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .quotation-table th, .quotation-table td { border: 1px solid #cbd5e1; padding: 8px 10px; vertical-align: top; }
         .quotation-table th { background: #f8fafc; color: #0f172a; text-align: left; font-weight: 700; }

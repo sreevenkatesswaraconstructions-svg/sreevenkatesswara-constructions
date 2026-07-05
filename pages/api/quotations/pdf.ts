@@ -42,10 +42,76 @@ function getSettingValue(settings: any, keys: string[]) {
   return ''
 }
 
+function getLogoSettingValue(settings: any) {
+  return getSettingValue(settings, ['logo', 'company_logo', 'companyLogo', 'logoUrl']) || ''
+}
+
+const mmToPt = (mm: number) => mm * 2.83465
+
 function ensurePageSpace(doc: any, space: number) {
-  if (doc.y + space > doc.page.height - doc.page.margins.bottom - 30) {
+  const contentBottom = doc.page.height - doc.page.margins.bottom - 20
+  if (doc.y + space > contentBottom) {
     doc.addPage()
   }
+}
+
+async function loadLogoBuffer(logoUrl: string): Promise<Buffer | null> {
+  console.log('[Quotation PDF] Company Logo URL:', logoUrl || '(none)')
+  if (!logoUrl) return null
+
+  if (logoUrl.startsWith('data:')) {
+    const matches = logoUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+    if (!matches) {
+      throw new Error('Invalid data URL for logo image')
+    }
+    const buffer = Buffer.from(matches[2], 'base64')
+    console.log('[Quotation PDF] logoBuffer status: data URL decoded', buffer.length)
+    return buffer
+  }
+
+  if (logoUrl.startsWith('/')) {
+    const localPath = path.join(process.cwd(), 'public', logoUrl.replace(/^\//, ''))
+    if (!fs.existsSync(localPath)) {
+      throw new Error(`Logo file not found at ${localPath}`)
+    }
+    const buffer = fs.readFileSync(localPath)
+    console.log('[Quotation PDF] logoBuffer status: local file loaded', buffer.length)
+    return buffer
+  }
+
+  if (/^https?:\/\//i.test(logoUrl)) {
+    console.log('[Quotation PDF] Fetching logo from remote URL')
+    try {
+      const response = await fetch(logoUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+        },
+      })
+      console.log('[Quotation PDF] Remote logo fetch status:', response.status, response.statusText)
+      if (!response.ok) {
+        throw new Error(`Logo download failed with status ${response.status} ${response.statusText}`)
+      }
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType && !contentType.startsWith('image/')) {
+        throw new Error(`Unexpected logo content type: ${contentType}`)
+      }
+      const buffer = Buffer.from(await response.arrayBuffer())
+      console.log('[Quotation PDF] logoBuffer status: remote image loaded', buffer.length)
+      return buffer
+    } catch (error) {
+      console.error('[Quotation PDF] Error downloading logo image:', error)
+      throw error
+    }
+  }
+
+  const localPath = path.join(process.cwd(), 'public', logoUrl)
+  if (fs.existsSync(localPath)) {
+    const buffer = fs.readFileSync(localPath)
+    console.log('[Quotation PDF] logoBuffer status: fallback local file loaded', buffer.length)
+    return buffer
+  }
+
+  throw new Error(`Unsupported logo URL format: ${logoUrl}`)
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -70,7 +136,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const bankDetails = getSettingValue(settings, ['bank_details', 'bankDetails', 'bank'])
     const upiQr = getSettingValue(settings, ['upi_qr', 'upiQr', 'upi'])
 
-    const doc: any = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true })
+    const doc: any = new PDFDocument({
+      size: 'A4',
+      margin: {
+        top: mmToPt(16),
+        right: mmToPt(14),
+        bottom: mmToPt(18),
+        left: mmToPt(14),
+      },
+      bufferPages: true,
+    })
     const chunks: any[] = []
     doc.on('data', (chunk: any) => chunks.push(chunk))
     doc.on('end', () => {
@@ -85,49 +160,106 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const left = doc.page.margins.left
     const top = doc.page.margins.top
 
-    function drawHeader() {
+    const logoUrl = getLogoSettingValue(settings) || '/images/logo.jpeg'
+    let logoBuffer: Buffer | null = null
+    if (logoUrl) {
+      try {
+        logoBuffer = await loadLogoBuffer(logoUrl)
+        console.log('[Quotation PDF] logoBuffer status:', logoBuffer ? 'ready' : 'empty')
+      } catch (error) {
+        console.error('[Quotation PDF] Image loading failed:', error)
+        throw error
+      }
+    }
+
+    const drawHeader = () => {
+      const headerTop = top
+      let currentY = headerTop
+
+      if (logoBuffer && !/\.svg$/i.test(logoUrl || '')) {
+        try {
+          doc.image(logoBuffer, left, currentY - 4, {
+            fit: [90, 90],
+            align: 'left',
+            quality: 100,
+          })
+          console.log('[Quotation PDF] Image loading success')
+        } catch (error) {
+          console.error('[Quotation PDF] Image loading error:', error)
+          throw error
+        }
+      } else if (!logoBuffer) {
+        console.log('[Quotation PDF] Skipping logo render because logoBuffer is empty')
+      }
+
+      const companyX = logoBuffer ? left + 120 : left
       doc.font('Helvetica-Bold').fontSize(18).fillColor(primaryColor)
-      doc.text(companyName, left, top, { align: 'left' })
+      doc.text(companyName, companyX, currentY, { align: 'left' })
+      currentY += 22
+      
       if (companyTagline) {
-        doc.moveDown(0.15)
-        doc.font('Helvetica').fontSize(10).fillColor(secondaryColor).text(companyTagline, { align: 'left' })
+        doc.font('Helvetica-Oblique').fontSize(13).fillColor(secondaryColor).text(companyTagline, companyX, currentY, { align: 'left' })
+        currentY += 16
       }
 
-      const addressLines: string[] = []
-      if (companyAddress) addressLines.push(companyAddress)
-      if (companyContact) addressLines.push(companyContact)
-      if (companyWebsite) addressLines.push(`Website: ${companyWebsite}`)
-      if (gstNumber) addressLines.push(`GST: ${gstNumber}`)
-
-      if (addressLines.length) {
-        doc.moveDown(0.35)
-        doc.font('Helvetica').fontSize(10).fillColor('#334155').text(addressLines.join(' | '), { align: 'left' })
+      doc.font('Helvetica').fontSize(11).fillColor('#334155')
+      const companyDetails: string[] = []
+      if (companyAddress) companyDetails.push(companyAddress)
+      if (companyContact) companyDetails.push(`Ph: ${companyContact}`)
+      if (settings?.email) companyDetails.push(`Email: ${settings.email}`)
+      if (companyWebsite) companyDetails.push(`Web: ${companyWebsite}`)
+      if (gstNumber) companyDetails.push(`GSTIN: ${gstNumber}`)
+      
+      if (companyDetails.length) {
+        doc.text(companyDetails.join('  |  '), companyX, currentY, { align: 'left' })
       }
 
-      doc.moveDown(0.7)
-      doc.strokeColor(secondaryColor).lineWidth(1.5).moveTo(left, doc.y).lineTo(left + pageWidth, doc.y).stroke()
-      doc.moveDown(0.6)
+      const infoX = doc.page.width - doc.page.margins.right - 200
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#1e293b')
+      doc.text('QUOTATION', infoX, top, { width: 200, align: 'right' })
+      doc.moveDown(0.2)
+      
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b')
+      doc.text('Quotation No:', infoX, doc.y, { width: 200, align: 'right' })
+      doc.font('Helvetica').fontSize(11).fillColor('#0f172a')
+      doc.text(quotation?.quotationNumber || `SVC-${new Date().getFullYear()}-0000`, infoX, doc.y, { width: 200, align: 'right' })
+      doc.moveDown(0.15)
+      
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b')
+      doc.text('Date:', infoX, doc.y, { width: 200, align: 'right' })
+      doc.font('Helvetica').fontSize(11).fillColor('#0f172a')
+      doc.text(quotation?.createdAt ? new Date(quotation.createdAt).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'), infoX, doc.y, { width: 200, align: 'right' })
+      doc.moveDown(0.15)
+      
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b')
+      doc.text('Status:', infoX, doc.y, { width: 200, align: 'right' })
+      doc.font('Helvetica').fontSize(11).fillColor('#0f172a')
+      doc.text(quotation?.status || 'Draft', infoX, doc.y, { width: 200, align: 'right' })
+
+      doc.moveDown(1)
+      doc.strokeColor(primaryColor).lineWidth(3).moveTo(left, doc.y).lineTo(left + pageWidth, doc.y).stroke()
+      doc.moveDown(0.5)
     }
 
-    function drawDocumentInfo() {
-      const infoX = doc.page.width - doc.page.margins.right - 180
-      const infoWidth = 180
-      doc.font('Helvetica').fontSize(10).fillColor('#111827')
-      doc.text(`Quotation No: ${quotation?.quotationNumber || `SVC-${new Date().getFullYear()}-0000`}`, infoX, top, { width: infoWidth, align: 'right' })
-      doc.text(`Date: ${quotation?.createdAt ? new Date(quotation.createdAt).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')}`, { width: infoWidth, align: 'right' })
-      doc.text(`Status: ${quotation?.status || 'Draft'}`, { width: infoWidth, align: 'right' })
-      doc.moveDown(0.4)
-    }
-
-    function addFooter(pageNumber?: number) {
-      const bottom = doc.page.height - doc.page.margins.bottom + 10
-      doc.font('Helvetica').fontSize(8).fillColor('#475569')
-      doc.text(companyAddress || '', left, bottom, { width: pageWidth * 0.65, align: 'left' })
-      const footerText = `Generated: ${new Date().toLocaleDateString('en-GB')} | Page ${pageNumber ?? doc.page.number}`
+    const addFooter = (pageNumber?: number) => {
+      const bottom = doc.page.height - doc.page.margins.bottom - 12
+      doc.strokeColor('#94a3b8').lineWidth(1).moveTo(left, bottom - 15).lineTo(left + pageWidth, bottom - 15).stroke()
+      
+      doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+      const footerLines: string[] = []
+      if (companyAddress) footerLines.push(companyAddress)
+      if (companyContact) footerLines.push(`Ph: ${companyContact}`)
+      if (settings?.email) footerLines.push(`Email: ${settings.email}`)
+      if (companyWebsite) footerLines.push(`Web: ${companyWebsite}`)
+      
+      const footerLeft = footerLines.join('  |  ')
+      doc.text(footerLeft || '', left, bottom, { width: pageWidth * 0.65, align: 'left' })
+      
+      const footerText = `Generated: ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}  |  Page ${pageNumber} of ${doc.bufferedPageRange().count}`
       doc.text(footerText, left, bottom, { width: pageWidth, align: 'right' })
     }
 
-    function drawSectionBox(title: string, estimatedHeight: number, renderBody: () => void) {
+    const drawSectionBox = (title: string, estimatedHeight: number, renderBody: () => void) => {
       ensurePageSpace(doc, estimatedHeight + 24)
       const boxTop = doc.y
       doc.roundedRect(left, boxTop, pageWidth, estimatedHeight, 8).lineWidth(1).strokeColor('#000000').stroke()
@@ -140,39 +272,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       doc.y = Math.max(doc.y, boxTop + estimatedHeight + 10)
     }
 
-    const logoUrl = getSettingValue(settings, ['logo'])
-    if (logoUrl) {
-      try {
-        let buffer: Buffer | null = null
-        if (logoUrl.startsWith('/')) {
-          const localPath = path.join(process.cwd(), 'public', logoUrl.replace(/^\//, ''))
-          if (fs.existsSync(localPath)) {
-            buffer = fs.readFileSync(localPath)
-          }
-        } else if (/^https?:\/\//i.test(logoUrl)) {
-          const response = await fetch(logoUrl)
-          if (response.ok) buffer = Buffer.from(await response.arrayBuffer())
-        } else {
-          const localPath = path.join(process.cwd(), 'public', logoUrl)
-          if (fs.existsSync(localPath)) buffer = fs.readFileSync(localPath)
-        }
-
-        if (buffer && !/\.svg$/i.test(logoUrl)) {
-          doc.image(buffer, left, doc.y, { fit: [120, 80], align: 'left' })
-          doc.moveDown(0.4)
-        }
-      } catch (err) {
-        console.error('Error loading logo for PDF:', err)
-      }
-    }
-
     doc.on('pageAdded', () => {
       drawHeader()
-      drawDocumentInfo()
     })
 
     drawHeader()
-    drawDocumentInfo()
 
     const selectedServices = Array.isArray(quotation.services) ? quotation.services : []
     const servicesText = selectedServices.length ? selectedServices.join(', ') : ''
@@ -192,11 +296,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ].filter(row => String(row.value || '').trim())
 
     if (customerRows.length) {
-      drawSectionBox('Customer Details', 36 + customerRows.length * 18, () => {
-        customerRows.forEach(row => {
-          doc.text(`${row.label}: ${row.value || '-'}`, { width: pageWidth - 24, paragraphGap: 2 })
-        })
+      const customerHeight = 60 + customerRows.length * 22
+      ensurePageSpace(doc, customerHeight + 24)
+      const customerBoxTop = doc.y
+      doc.roundedRect(left, customerBoxTop, pageWidth, customerHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+      
+      doc.rect(left, customerBoxTop, pageWidth, 30).fillColor(primaryColor).fill()
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('white')
+      doc.text('CUSTOMER INFORMATION', left + 15, customerBoxTop + 10, { width: pageWidth - 30 })
+      
+      doc.y = customerBoxTop + 40
+      doc.font('Helvetica').fontSize(10).fillColor('#334155')
+      
+      const colWidth = (pageWidth - 30) / 2
+      customerRows.forEach((row, index) => {
+        const isLeft = index % 2 === 0
+        const xPos = isLeft ? left + 15 : left + 15 + colWidth + 10
+        const yPos = isLeft ? doc.y : doc.y - 22
+        
+        doc.text(`${row.label}:`, xPos, yPos, { width: 100, continued: true })
+        doc.text(row.value || '-', { width: colWidth - 110 })
+        
+        if (isLeft && index < customerRows.length - 1) {
+          doc.moveDown(0.5)
+        }
       })
+      
+      doc.y = customerBoxTop + customerHeight + 15
     }
 
     const projectRows = [
@@ -210,11 +336,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ].filter(row => String(row.value || '').trim())
 
     if (projectRows.length) {
-      drawSectionBox('Project Details', 36 + projectRows.length * 18, () => {
-        projectRows.forEach(row => {
-          doc.text(`${row.label}: ${row.value || '-'}`, { width: pageWidth - 24, paragraphGap: 2 })
-        })
+      const projectHeight = 60 + projectRows.length * 22
+      ensurePageSpace(doc, projectHeight + 24)
+      const projectBoxTop = doc.y
+      doc.roundedRect(left, projectBoxTop, pageWidth, projectHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+      
+      doc.rect(left, projectBoxTop, pageWidth, 30).fillColor(secondaryColor).fill()
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('white')
+      doc.text('PROJECT INFORMATION', left + 15, projectBoxTop + 10, { width: pageWidth - 30 })
+      
+      doc.y = projectBoxTop + 40
+      doc.font('Helvetica').fontSize(10).fillColor('#334155')
+      
+      const colWidth = (pageWidth - 30) / 2
+      projectRows.forEach((row, index) => {
+        const isLeft = index % 2 === 0
+        const xPos = isLeft ? left + 15 : left + 15 + colWidth + 10
+        const yPos = isLeft ? doc.y : doc.y - 22
+        
+        doc.text(`${row.label}:`, xPos, yPos, { width: 100, continued: true })
+        doc.text(row.value || '-', { width: colWidth - 110 })
+        
+        if (isLeft && index < projectRows.length - 1) {
+          doc.moveDown(0.5)
+        }
       })
+      
+      doc.y = projectBoxTop + projectHeight + 15
     }
 
     if (servicesText) {
@@ -224,47 +372,204 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (boqRows.length) {
-      drawSectionBox('Bill of Quantities (BOQ)', 50 + boqRows.length * 16, () => {
-        const columns = [140, 70, 45, 40, 55, 35, 55]
-        const xPositions = [left + 12, left + 12 + columns[0], left + 12 + columns[0] + columns[1], left + 12 + columns[0] + columns[1] + columns[2], left + 12 + columns[0] + columns[1] + columns[2] + columns[3], left + 12 + columns[0] + columns[1] + columns[2] + columns[3] + columns[4], left + 12 + columns[0] + columns[1] + columns[2] + columns[3] + columns[4] + columns[5]]
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#111827')
-        doc.text('Description', xPositions[0], doc.y, { width: columns[0] })
-        doc.text('Category', xPositions[1], doc.y, { width: columns[1] })
-        doc.text('Unit', xPositions[2], doc.y, { width: columns[2] })
-        doc.text('Qty', xPositions[3], doc.y, { width: columns[3] })
-        doc.text('Rate', xPositions[4], doc.y, { width: columns[4] })
-        doc.text('GST', xPositions[5], doc.y, { width: columns[5] })
-        doc.text('Amount', xPositions[6], doc.y, { width: columns[6] })
-        doc.moveDown(0.5)
-        doc.font('Helvetica').fontSize(8)
-        boqRows.forEach((row: any) => {
-          doc.text(String(row.description || '-'), xPositions[0], doc.y, { width: columns[0] })
-          doc.text(String(row.category || '-'), xPositions[1], doc.y, { width: columns[1] })
-          doc.text(String(row.unit || '-'), xPositions[2], doc.y, { width: columns[2] })
-          doc.text(String(row.quantity || 0), xPositions[3], doc.y, { width: columns[3] })
-          doc.text(formatCurrency(row.rate), xPositions[4], doc.y, { width: columns[4] })
-          doc.text(`${row.gst || 0}%`, xPositions[5], doc.y, { width: columns[5] })
-          doc.text(formatCurrency(row.amount), xPositions[6], doc.y, { width: columns[6] })
-          doc.moveDown(0.4)
+      const drawBOQTable = () => {
+        const tableLeft = left + 15
+        const tableWidth = pageWidth - 30
+        const columns = [40, 180, 80, 45, 50, 70, 70]
+        const xPositions = columns.reduce((acc: number[], col: number, idx: number) => {
+          acc.push(idx === 0 ? tableLeft : acc[idx - 1] + columns[idx - 1])
+          return acc
+        }, [] as number[])
+        const headers = ['S.No', 'Description', 'Brand', 'Unit', 'Qty', 'Rate', 'Amount']
+        const rightAlignCols = [4, 5, 6]
+
+        const drawTableHeader = (y: number) => {
+          doc.save()
+          doc.rect(tableLeft, y, tableWidth, 26).fillColor(primaryColor).fill()
+          doc.font('Helvetica-Bold').fontSize(10).fillColor('white')
+          headers.forEach((header, idx) => {
+            const align = rightAlignCols.includes(idx) ? 'right' : 'left'
+            doc.text(header, xPositions[idx] + 5, y + 8, { width: columns[idx] - 10, align })
+          })
+          doc.restore()
+        }
+
+        const drawCategoryRow = (category: string, y: number) => {
+          const rowHeight = 28
+          doc.save()
+          doc.rect(tableLeft, y, tableWidth, rowHeight).fillColor('#f8fafc').fill()
+          doc.rect(tableLeft, y, tableWidth, rowHeight).lineWidth(1).strokeColor('#94a3b8').stroke()
+          doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a')
+          doc.text(category.toUpperCase(), tableLeft + 10, y + 9)
+          doc.restore()
+          return rowHeight
+        }
+
+        const drawCategorySubtotal = (category: string, subtotal: number, y: number) => {
+          const rowHeight = 28
+          doc.save()
+          doc.rect(tableLeft, y, tableWidth, rowHeight).fillColor('#e2e8f0').fill()
+          doc.rect(tableLeft, y, tableWidth, rowHeight).lineWidth(1).strokeColor('#64748b').stroke()
+          doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b')
+          doc.text(`${category} Subtotal:`, tableLeft + 10, y + 9)
+          doc.text(formatCurrency(subtotal), xPositions[6] + 5, y + 9, { width: columns[6] - 10, align: 'right' })
+          doc.restore()
+          return rowHeight
+        }
+
+        const drawTableRow = (row: any, y: number, slNo: number) => {
+          const rowHeight = 24
+          doc.save()
+          doc.rect(tableLeft, y, tableWidth, rowHeight).lineWidth(0.75).strokeColor('#cbd5e1').stroke()
+          doc.font('Helvetica').fontSize(9).fillColor('#334155')
+          
+          doc.text(String(slNo), xPositions[0] + 5, y + 8, { width: columns[0] - 10, align: 'center' })
+          
+          const desc = String(row.description || '-')
+          const descHeight = doc.heightOfString(desc, { width: columns[1] - 10 })
+          const adjustedRowHeight = Math.max(rowHeight, descHeight + 10)
+          
+          if (descHeight > 14) {
+            doc.rect(tableLeft, y, tableWidth, adjustedRowHeight).lineWidth(0.75).strokeColor('#cbd5e1').stroke()
+          }
+          
+          doc.text(desc, xPositions[1] + 5, y + 8, { width: columns[1] - 10 })
+          doc.text(String(row.brand || '-'), xPositions[2] + 5, y + 8, { width: columns[2] - 10 })
+          doc.text(String(row.unit || '-'), xPositions[3] + 5, y + 8, { width: columns[3] - 10, align: 'center' })
+          doc.text(String(row.quantity || 0), xPositions[4] + 5, y + 8, { width: columns[4] - 10, align: 'right' })
+          doc.text(formatCurrency(row.rate), xPositions[5] + 5, y + 8, { width: columns[5] - 10, align: 'right' })
+          doc.text(formatCurrency(row.amount), xPositions[6] + 5, y + 8, { width: columns[6] - 10, align: 'right' })
+          doc.restore()
+          return adjustedRowHeight
+        }
+
+        let tableY = doc.y
+        drawTableHeader(tableY)
+        tableY += 26
+
+        const groupedBOQ = boqRows.reduce((acc: any, row: any) => {
+          const category = row.category || 'General'
+          if (!acc[category]) acc[category] = []
+          acc[category].push(row)
+          return acc
+        }, {})
+
+        let globalSlNo = 1
+        Object.keys(groupedBOQ).forEach((category) => {
+          const categoryRows = groupedBOQ[category]
+          
+          if (tableY + 60 > doc.page.height - doc.page.margins.bottom - 40) {
+            doc.addPage()
+            tableY = doc.y
+            drawTableHeader(tableY)
+            tableY += 26
+          }
+
+          const catRowHeight = drawCategoryRow(category, tableY)
+          tableY += catRowHeight
+
+          let categorySubtotal = 0
+          categoryRows.forEach((row: any) => {
+            if (tableY + 35 > doc.page.height - doc.page.margins.bottom - 40) {
+              doc.addPage()
+              tableY = doc.y
+              drawTableHeader(tableY)
+              tableY += 26
+              const catRowHeight = drawCategoryRow(category, tableY)
+              tableY += catRowHeight
+            }
+            const rowHeight = drawTableRow(row, tableY, globalSlNo++)
+            tableY += rowHeight
+            categorySubtotal += Number(row.amount || 0)
+          })
+
+          if (tableY + 35 > doc.page.height - doc.page.margins.bottom - 40) {
+            doc.addPage()
+            tableY = doc.y
+          }
+          const subtotalRowHeight = drawCategorySubtotal(category, categorySubtotal, tableY)
+          tableY += subtotalRowHeight
         })
-      })
+
+        doc.y = tableY + 15
+      }
+
+      const estimatedBOQHeight = 80 + boqRows.length * 30
+      ensurePageSpace(doc, estimatedBOQHeight + 40)
+      const boxTop = doc.y
+      doc.roundedRect(left, boxTop, pageWidth, estimatedBOQHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+      
+      doc.rect(left, boxTop, pageWidth, 35).fillColor(primaryColor).fill()
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('white')
+      doc.text('BILL OF QUANTITIES', left + 15, boxTop + 12, { width: pageWidth - 30 })
+      
+      doc.y = boxTop + 45
+      drawBOQTable()
+      doc.y = Math.max(doc.y, boxTop + estimatedBOQHeight + 15)
     }
 
     if (paymentRows.length) {
-      drawSectionBox('Payment Schedule', 50 + paymentRows.length * 16, () => {
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#111827')
-        doc.text('Milestone', { continued: true, width: 180 })
-        doc.text('Percent', { continued: true, width: 80, align: 'right' })
-        doc.text('Amount', { width: 80, align: 'right' })
-        doc.moveDown(0.25)
-        doc.font('Helvetica').fontSize(8)
-        paymentRows.forEach((item: any) => {
-          doc.text(String(item.title || 'Milestone'), { continued: true, width: 180 })
-          doc.text(`${item.percent || 0}%`, { continued: true, width: 80, align: 'right' })
-          doc.text(formatCurrency(((quotation.grandTotal || quotation.grand_total || 0) * (item.percent || 0)) / 100), { width: 80, align: 'right' })
-          doc.moveDown(0.2)
+      const paymentHeight = 70 + paymentRows.length * 26
+      ensurePageSpace(doc, paymentHeight + 30)
+      const paymentBoxTop = doc.y
+      doc.roundedRect(left, paymentBoxTop, pageWidth, paymentHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+      
+      doc.rect(left, paymentBoxTop, pageWidth, 35).fillColor(primaryColor).fill()
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('white')
+      doc.text('PAYMENT TERMS', left + 15, paymentBoxTop + 12, { width: pageWidth - 30 })
+      
+      doc.y = paymentBoxTop + 50
+      
+      const tableLeft = left + 15
+      const tableWidth = pageWidth - 30
+      const columns = [200, 90, 90]
+      const xPositions = columns.reduce((acc: number[], col: number, idx: number) => {
+        acc.push(idx === 0 ? tableLeft : acc[idx - 1] + columns[idx - 1])
+        return acc
+      }, [] as number[])
+      const headers = ['Milestone', 'Percentage', 'Amount']
+      const rightAlignCols = [1, 2]
+
+      const drawPaymentHeader = (y: number) => {
+        doc.save()
+        doc.rect(tableLeft, y, tableWidth, 24).fillColor('#f1f5f9').fill()
+        doc.rect(tableLeft, y, tableWidth, 24).lineWidth(1).strokeColor('#94a3b8').stroke()
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b')
+        headers.forEach((header, idx) => {
+          const align = rightAlignCols.includes(idx) ? 'right' : 'left'
+          doc.text(header, xPositions[idx] + 8, y + 8, { width: columns[idx] - 16, align })
         })
+        doc.restore()
+      }
+
+      const drawPaymentRow = (item: any, y: number) => {
+        const rowHeight = 26
+        doc.save()
+        doc.rect(tableLeft, y, tableWidth, rowHeight).lineWidth(0.75).strokeColor('#cbd5e1').stroke()
+        doc.font('Helvetica').fontSize(10).fillColor('#334155')
+        doc.text(String(item.title || 'Milestone'), xPositions[0] + 8, y + 8, { width: columns[0] - 16 })
+        doc.text(`${item.percent || 0}%`, xPositions[1] + 8, y + 8, { width: columns[1] - 16, align: 'right' })
+        doc.text(formatCurrency(((quotation.grandTotal || quotation.grand_total || 0) * (item.percent || 0)) / 100), xPositions[2] + 8, y + 8, { width: columns[2] - 16, align: 'right' })
+        doc.restore()
+        return rowHeight
+      }
+
+      let paymentY = doc.y
+      drawPaymentHeader(paymentY)
+      paymentY += 24
+
+      paymentRows.forEach((item: any) => {
+        if (paymentY + 35 > doc.page.height - doc.page.margins.bottom - 40) {
+          doc.addPage()
+          paymentY = doc.y
+          drawPaymentHeader(paymentY)
+          paymentY += 24
+        }
+        const rowHeight = drawPaymentRow(item, paymentY)
+        paymentY += rowHeight
       })
+
+      doc.y = paymentBoxTop + paymentHeight + 15
     }
 
     const summaryRows = [
@@ -273,74 +578,171 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(quotation.discount ? [{ label: 'Discount', value: formatCurrency(quotation.discount) }] : []),
     ]
 
-    drawSectionBox('Summary', 34 + summaryRows.length * 18, () => {
-      summaryRows.forEach(row => {
-        doc.text(`${row.label}: ${row.value}`, { width: pageWidth - 24, paragraphGap: 2 })
-      })
-      doc.text(`Grand Total: ${formatCurrency(quotation.grandTotal || quotation.grand_total || 0)}`, { width: pageWidth - 24, paragraphGap: 2 })
+    const summaryHeight = 70 + summaryRows.length * 28 + 40
+    ensurePageSpace(doc, summaryHeight + 30)
+    const summaryBoxTop = doc.y
+    doc.roundedRect(left, summaryBoxTop, pageWidth, summaryHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+    
+    doc.rect(left, summaryBoxTop, pageWidth, 35).fillColor(secondaryColor).fill()
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('white')
+    doc.text('PAYMENT SUMMARY', left + 15, summaryBoxTop + 12, { width: pageWidth - 30 })
+    
+    doc.y = summaryBoxTop + 50
+    doc.font('Helvetica').fontSize(11).fillColor('#334155')
+    summaryRows.forEach(row => {
+      doc.text(`${row.label}:`, { continued: true, width: pageWidth - 30 - 150 })
+      doc.text(row.value, { width: 150, align: 'right' })
+      doc.moveDown(0.5)
     })
+    const grandTotalY = doc.y + 10
+    doc.roundedRect(left + 15, grandTotalY, pageWidth - 30, 38, 6).fillColor(primaryColor).fill()
+    doc.font('Helvetica-Bold').fontSize(16).fillColor('white')
+    doc.text('GRAND TOTAL:', left + 25, grandTotalY + 12, { continued: true, width: pageWidth - 30 - 180 })
+    doc.text(formatCurrency(quotation.grandTotal || quotation.grand_total || 0), { width: 150, align: 'right' })
+    doc.y = summaryBoxTop + summaryHeight + 15
 
     if (terms.length) {
-      drawSectionBox('Terms & Conditions', 34 + terms.length * 18, () => {
-        terms.forEach((term: string, index: number) => {
-          doc.text(`${index + 1}. ${term || '-'}`, { width: pageWidth - 24, paragraphGap: 2 })
+      const normalizedTerms = terms
+        .map((term: string) => String(term || '').trim())
+        .filter(Boolean)
+        .map((term: string) => term.replace(/^\s*\d+[.)\-]\s*/, '').trim())
+
+      const numberX = left + 15
+      const numberColumnWidth = Math.max(18, doc.widthOfString(`${normalizedTerms.length}.`) + 8)
+      const textX = numberX + numberColumnWidth + 4
+      const textWidth = pageWidth - textX + left - 10
+      const itemGap = 8
+
+      const termsHeight =
+        35 +
+        15 +
+        normalizedTerms.reduce((height, term) => {
+          return (
+            height +
+            doc.heightOfString(term, {
+              width: textWidth,
+              align: 'justify',
+              lineGap: 3,
+            }) +
+            itemGap
+          )
+        }, 0) +
+        15
+
+      ensurePageSpace(doc, termsHeight + 30)
+      const termsBoxTop = doc.y
+      doc.roundedRect(left, termsBoxTop, pageWidth, termsHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+
+      doc.rect(left, termsBoxTop, pageWidth, 35).fillColor(primaryColor).fill()
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('white')
+      doc.text('TERMS & CONDITIONS', left + 15, termsBoxTop + 12, { width: pageWidth - 30 })
+
+      doc.y = termsBoxTop + 50
+      doc.font('Helvetica').fontSize(10).fillColor('#334155')
+
+      normalizedTerms.forEach((term: string, index: number) => {
+        const startY = doc.y
+        const serialNumber = `${index + 1}.`
+        const serialNumberWidth = doc.widthOfString(serialNumber)
+
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#334155')
+        doc.text(serialNumber, numberX + numberColumnWidth - serialNumberWidth, startY, {
+          width: numberColumnWidth,
+          align: 'left',
         })
+
+        const textHeight = doc.heightOfString(term, {
+          width: textWidth,
+          align: 'justify',
+          lineGap: 3,
+        })
+
+        doc.font('Helvetica').fontSize(10).fillColor('#334155')
+        doc.text(term, textX, startY, {
+          width: textWidth,
+          align: 'justify',
+          lineGap: 3,
+        })
+
+        doc.y = startY + textHeight + itemGap
       })
+
+      doc.y += 8
     }
 
     const notesText = String(quotation.notes || '').trim()
     if (notesText) {
-      drawSectionBox('Notes', 34 + 16, () => {
-        doc.text(notesText, { width: pageWidth - 24, paragraphGap: 2 })
-      })
+      const notesHeight = 34 + 50
+      ensurePageSpace(doc, notesHeight + 24)
+      const notesBoxTop = doc.y
+      doc.roundedRect(left, notesBoxTop, pageWidth, notesHeight, 8).lineWidth(1).strokeColor('#000000').stroke()
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(primaryColor)
+      doc.text('Notes', left + 12, notesBoxTop + 10, { width: pageWidth - 24 })
+      doc.y = notesBoxTop + 36
+      doc.font('Helvetica').fontSize(10).fillColor('#111827')
+      doc.text(notesText, { width: pageWidth - 24, paragraphGap: 2 })
+      doc.y = notesBoxTop + notesHeight + 10
     }
 
     if (attachments.length) {
-      drawSectionBox('Attachments', 34 + attachments.length * 18, () => {
-        attachments.forEach((attachment: any, index: number) => {
-          doc.text(`${index + 1}. ${attachment.originalName || attachment.name || attachment.fileName || attachment.filename || ''}`, { width: pageWidth - 24, paragraphGap: 2 })
-        })
+      const attachmentsHeight = 34 + attachments.length * 20
+      ensurePageSpace(doc, attachmentsHeight + 24)
+      const attachmentsBoxTop = doc.y
+      doc.roundedRect(left, attachmentsBoxTop, pageWidth, attachmentsHeight, 8).lineWidth(1).strokeColor('#000000').stroke()
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(primaryColor)
+      doc.text('Attachments', left + 12, attachmentsBoxTop + 10, { width: pageWidth - 24 })
+      doc.y = attachmentsBoxTop + 36
+      doc.font('Helvetica').fontSize(10).fillColor('#111827')
+      attachments.forEach((attachment: any, index: number) => {
+        doc.text(`${index + 1}. ${attachment.originalName || attachment.name || attachment.fileName || attachment.filename || ''}`, { width: pageWidth - 24, paragraphGap: 4 })
+        doc.moveDown(0.2)
       })
+      doc.y = attachmentsBoxTop + attachmentsHeight + 10
     }
 
-    drawSectionBox('Signatures', 130, () => {
-      const boxWidth = (pageWidth - 24 - 24) / 3
-      const boxHeight = 86
-      const startX = doc.x
-      const startY = doc.y
+    const signaturesHeight = 150
+    ensurePageSpace(doc, signaturesHeight + 30)
+    const sigBoxTop = doc.y
+    doc.roundedRect(left, sigBoxTop, pageWidth, signaturesHeight, 10).lineWidth(1.5).strokeColor('#1e293b').stroke()
+    
+    doc.rect(left, sigBoxTop, pageWidth, 35).fillColor(primaryColor).fill()
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('white')
+    doc.text('SIGNATURES', left + 15, sigBoxTop + 12, { width: pageWidth - 30 })
+    
+    doc.y = sigBoxTop + 50
 
-      const drawSignatureBox = (x: number, label: string, name?: string, subtitle?: string) => {
-        doc.save()
-        doc.rect(x, startY, boxWidth, boxHeight).lineWidth(0.5).strokeColor('#cbd5e1').stroke()
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a').text(label, x + 8, startY + 8, { width: boxWidth - 16 })
-        if (name) {
-          doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(name, x + 8, startY + 24, { width: boxWidth - 16 })
-        }
-        if (subtitle) {
-          doc.font('Helvetica').fontSize(8).fillColor('#475569').text(subtitle, x + 8, startY + 42, { width: boxWidth - 16 })
-        }
-        const lineY = startY + boxHeight - 20
-        doc.moveTo(x + 8, lineY).lineTo(x + boxWidth - 8, lineY).lineWidth(0.8).strokeColor('#94a3b8').stroke()
-        doc.restore()
+    const boxWidth = (pageWidth - 30 - 20) / 3
+    const boxHeight = 95
+    const startX = left + 15
+    const startY = doc.y
+
+    const drawSignatureBox = (x: number, label: string, name?: string, subtitle?: string) => {
+      doc.save()
+      doc.roundedRect(x, startY, boxWidth, boxHeight, 8).lineWidth(1).strokeColor('#94a3b8').stroke()
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#1e293b')
+      doc.text(label, x + 12, startY + 12, { width: boxWidth - 24 })
+      if (name) {
+        doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a')
+        doc.text(name, x + 12, startY + 35, { width: boxWidth - 24 })
       }
+      if (subtitle) {
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor('#64748b')
+        doc.text(subtitle, x + 12, startY + 52, { width: boxWidth - 24 })
+      }
+      const lineY = startY + boxHeight - 28
+      doc.moveTo(x + 12, lineY).lineTo(x + boxWidth - 12, lineY).lineWidth(1.5).strokeColor('#475569').stroke()
+      doc.restore()
+    }
 
-      drawSignatureBox(
-        startX,
-        'Prepared By',
-        companyName || 'Sree Venkateswara',
-        companyTagline || 'Constructions & Interiors'
-      )
-      drawSignatureBox(startX + boxWidth + 12, 'Authorized Signature')
-      drawSignatureBox(startX + (boxWidth + 12) * 2, 'Customer Signature')
-      doc.y = startY + boxHeight + 12
-    })
-
-    ensurePageSpace(doc, 40)
-    doc.strokeColor('#cbd5e1').lineWidth(1).moveTo(left, doc.y).lineTo(left + pageWidth, doc.y).stroke()
-    doc.moveDown(0.6)
-    doc.font('Helvetica').fontSize(9).fillColor('#475569').text(companyAddress || '', { align: 'left' })
-    if (companyWebsite) doc.text(`Web: ${companyWebsite}`, { align: 'left' })
-    if (companyContact) doc.text(companyContact, { align: 'left' })
+    drawSignatureBox(
+      startX,
+      'Prepared By',
+      companyName || 'Sree Venkateswara',
+      companyTagline || 'Constructions & Interiors'
+    )
+    drawSignatureBox(startX + boxWidth + 10, 'Authorized Signature')
+    drawSignatureBox(startX + (boxWidth + 10) * 2, 'Customer Signature')
+    doc.y = sigBoxTop + signaturesHeight + 15
 
     const range = doc.bufferedPageRange()
     for (let i = 0; i < range.count; i++) {
