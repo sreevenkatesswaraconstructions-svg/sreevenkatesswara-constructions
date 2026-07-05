@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { generateOTP } from '../../../../lib/otp'
 import { sendOTPEmail } from '../../../../lib/email'
 import { prisma } from '../../../../lib/prisma'
+console.log("===== SEND OTP VERSION 2 =====");
 
 /**
  * Send OTP API Endpoint
