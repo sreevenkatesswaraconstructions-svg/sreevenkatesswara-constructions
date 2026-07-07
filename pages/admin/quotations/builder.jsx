@@ -283,7 +283,7 @@ export default function QuotationBuilder({ quotationId }){
 
   useEffect(() => {
     computeTotals()
-  }, [data.boq, data.discountPercent])
+  }, [data.boq, data.discountPercent, data.gstPercent])
 
   // Sync workBlocks to boq whenever workBlocks change
   useEffect(() => {
@@ -571,7 +571,6 @@ export default function QuotationBuilder({ quotationId }){
       if (!d.success) {
         throw new Error(d.message || 'Save failed')
       }
-
       setUnsaved(false)
       const nextId = String(d.data?.id || requestDetails.id || '').trim()
       if (nextId) {

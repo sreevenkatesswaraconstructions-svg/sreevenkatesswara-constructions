@@ -204,13 +204,32 @@ export const buildQuotationHtml = (
     : (computedSubtotal > 0 ? (Number(quotation.discount || 0) / computedSubtotal) * 100 : 0)
   const discountAmount = computedSubtotal * (discountPercent / 100)
   const subtotalAfterDiscount = computedSubtotal - discountAmount
-  const computedGstTotal = boqRows.reduce((sum, row: any) => {
-    const amount = Number(row?.amount || 0)
-    const discountedAmount = amount - (amount * (discountPercent / 100))
-    const gstRate = Number(row?.gst || 0)
-    return sum + (discountedAmount * gstRate / 100)
-  }, 0)
-  const computedGrandTotal = subtotalAfterDiscount + computedGstTotal
+  const hasStoredGstPercent = quotation.gstPercent !== undefined && quotation.gstPercent !== null
+  const hasStoredGstAmount = quotation.gstAmount !== undefined && quotation.gstAmount !== null
+  const hasStoredGstTotal = quotation.gstTotal !== undefined && quotation.gstTotal !== null
+  const storedGstValue = hasStoredGstAmount
+    ? Number(quotation.gstAmount)
+    : (hasStoredGstTotal ? Number(quotation.gstTotal) : null)
+  const computedGstTotal = storedGstValue !== null
+    ? storedGstValue
+    : boqRows.reduce((sum, row: any) => {
+      const amount = Number(row?.amount || 0)
+      const discountedAmount = amount - (amount * (discountPercent / 100))
+      const gstRate = Number(row?.gst || 0)
+      return sum + (discountedAmount * gstRate / 100)
+    }, 0)
+  const hasStoredGrandTotal = quotation.grandTotal !== undefined && quotation.grandTotal !== null
+  const computedGrandTotal = hasStoredGrandTotal
+    ? Number(quotation.grandTotal)
+    : subtotalAfterDiscount + computedGstTotal
+  const subtotalValue = computedSubtotal
+  const discountPercentValue = discountPercent
+  const discountValue = discountAmount
+  const subtotalAfterDiscountValue = subtotalAfterDiscount
+  const gstPercentValue = hasStoredGstPercent
+    ? Number(quotation.gstPercent)
+    : (subtotalAfterDiscountValue > 0 ? (computedGstTotal / subtotalAfterDiscountValue) * 100 : 0)
+  const gstValue = computedGstTotal
 
   const boqSectionsHtml = Object.entries(boqSections).map(([category, rows]) => {
     const sectionRowsHtml = (rows as Array<any>).map((row: any, index: number) => `
@@ -253,6 +272,7 @@ export const buildQuotationHtml = (
     : Array.isArray(quotation.payment_schedule)
       ? quotation.payment_schedule
       : []
+
   const paymentRowsHtml = paymentRows.map((item: any) => `
       <tr>
         <td>${escapeHtml(item.title || 'Milestone')}</td>
@@ -273,16 +293,6 @@ export const buildQuotationHtml = (
     </div>
   ` : ''
 
-  const subtotalValue = quotation.subtotal || quotation.sub_total || computedSubtotal
-  const hasStoredDiscountPercent = quotation.discountPercent !== undefined && quotation.discountPercent !== null
-  const discountPercentValue = hasStoredDiscountPercent
-    ? Number(quotation.discountPercent)
-    : (subtotalValue > 0 ? (Number(quotation.discount || 0) / subtotalValue) * 100 : 0)
-  const discountValue = quotation.discount || 0
-  const subtotalAfterDiscountValue = subtotalValue - discountValue
-  const gstValue = quotation.gstTotal || quotation.gst_total || computedGstTotal
-  const hasStoredGstPercent = quotation.gstPercent !== undefined && quotation.gstPercent !== null
-  const gstPercentValue = Number(hasStoredGstPercent ? quotation.gstPercent : (subtotalAfterDiscountValue > 0 ? (gstValue / subtotalAfterDiscountValue) * 100 : 0))
   const summaryRows = [
     { label: 'TOTAL BOQ', value: formatCurrency(subtotalValue) },
     { label: 'Discount %', value: `${discountPercentValue.toFixed(2)}%` },

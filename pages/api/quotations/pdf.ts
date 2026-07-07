@@ -579,12 +579,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subtotalValue = quotation.subtotal || quotation.sub_total || 0
     const discountValue = quotation.discount || 0
     const subtotalAfterDiscountValue = subtotalValue - discountValue
-    const gstValue = quotation.gstTotal || quotation.gst_total || 0
+    const hasStoredGstPercent = quotation.gstPercent !== undefined && quotation.gstPercent !== null
+    const gstValue = quotation.gstAmount !== undefined && quotation.gstAmount !== null
+      ? Number(quotation.gstAmount)
+      : (quotation.gstTotal !== undefined && quotation.gstTotal !== null ? Number(quotation.gstTotal) : 0)
     const hasStoredDiscountPercent = quotation.discountPercent !== undefined && quotation.discountPercent !== null
     const discountPercentValue = hasStoredDiscountPercent
       ? Number(quotation.discountPercent)
       : (subtotalValue > 0 ? (discountValue / subtotalValue) * 100 : 0)
-    const hasStoredGstPercent = quotation.gstPercent !== undefined && quotation.gstPercent !== null
     const gstPercentValue = Number(hasStoredGstPercent ? quotation.gstPercent : (subtotalAfterDiscountValue > 0 ? (gstValue / subtotalAfterDiscountValue) * 100 : 0))
     const summaryRows = [
       { label: 'Discount %', value: `${discountPercentValue.toFixed(2)}%` },
