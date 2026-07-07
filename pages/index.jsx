@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import SEO from '../components/SEO'
 import Hero from '../components/Hero'
 import ServiceCard from '../components/ServiceCard'
@@ -25,13 +26,50 @@ const reasons = [
   { title: 'Skilled Professionals', description: 'Experienced architects, designers and artisans deliver exceptional results.' }
 ]
 
-const testimonials = [
-  { quote: 'Sree Venkatesswara turned our villa vision into a calm, luxurious reality with true craftsmanship.', name: 'Priya R.', role: 'Home Owner', company: 'Visakhapatnam' },
-  { quote: 'The interiors are both elegant and functional. Their team delivered on time and with care.', name: 'Rajesh K.', role: 'Business Owner', company: 'Bangarupalem' },
-  { quote: 'From consultation to handover, the process was seamless and deeply professional.', name: 'Anjali S.', role: 'Interior Enthusiast', company: 'Vizag' }
-]
-
 export default function Home(){
+  const [featuredTestimonials, setFeaturedTestimonials] = useState([])
+  const [isLoadingTestimonials, setIsLoadingTestimonials] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchTestimonials = async () => {
+      try {
+        const response = await fetch('/api/testimonials?status=Approved&featured=true')
+        const result = await response.json()
+
+        if (!isMounted) return
+
+        if (result.success) {
+          const visibleTestimonials = [...(result.data || [])]
+            .filter((item) => String(item.status || '').toLowerCase() === 'approved' && Boolean(item.isFeatured))
+            .sort((a, b) => {
+              const orderDifference = (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
+
+              if (orderDifference !== 0) return orderDifference
+
+              return new Date(b.createdAt) - new Date(a.createdAt)
+            })
+
+          setFeaturedTestimonials(visibleTestimonials)
+        } else {
+          setFeaturedTestimonials([])
+        }
+      } catch (error) {
+        console.error('[HOME TESTIMONIALS] Error fetching testimonials:', error)
+        if (isMounted) setFeaturedTestimonials([])
+      } finally {
+        if (isMounted) setIsLoadingTestimonials(false)
+      }
+    }
+
+    fetchTestimonials()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <>
       <SEO title="Sree Venkatesswara Constructions & Interiors" description="Building dreams and creating luxury spaces with premium construction and interiors." />
@@ -131,8 +169,35 @@ export default function Home(){
             <h2 className="text-4xl font-serif text-emerald">Trusted by clients who value luxury and reliability.</h2>
           </div>
           <div className="grid gap-6 md:grid-cols-3">
-            {testimonials.map((item, index) => <TestimonialCard key={index} quote={item.quote} name={item.name} role={item.role} company={item.company} />)}
+            {!isLoadingTestimonials && featuredTestimonials.length === 0 ? (
+              <div className="md:col-span-3 glass-panel p-8 rounded-[1.75rem] border border-emerald/10 shadow-xl text-center">
+                <p className="text-lg font-semibold text-emerald">Customer testimonials will be available soon.</p>
+                <p className="mt-2 text-sm text-gray-600">Approved featured reviews from our clients will appear here.</p>
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  <p className="text-base font-semibold text-emerald">Have you worked with us?</p>
+                  <p className="text-sm text-gray-600">We'd love to hear about your experience.</p>
+                  <Link href="/share-your-experience" className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-white font-semibold">⭐ Share Your Experience</Link>
+                </div>
+              </div>
+            ) : (
+              featuredTestimonials.map((item) => (
+                <TestimonialCard
+                  key={item.id}
+                  quote={item.reviewMessage}
+                  name={item.customerName}
+                  projectType={item.customerRole}
+                  location={item.customerLocation}
+                  photo={item.customerPhoto}
+                  rating={item.rating}
+                />
+              ))
+            )}
           </div>
+          {!isLoadingTestimonials && featuredTestimonials.length > 0 && (
+            <div className="flex justify-center mt-8">
+              <Link href="/share-your-experience" className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-white font-semibold">⭐ Share Your Experience</Link>
+            </div>
+          )}
         </section>
 
         <section className="glass-panel rounded-[2rem] border border-emerald/10 p-10 text-center bg-white/85 shadow-2xl">

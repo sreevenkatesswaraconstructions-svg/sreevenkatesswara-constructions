@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/router'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import { Plus, Trash2, Copy, UploadCloud, FileText, Printer, Mail, MessageSquare, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { buildQuotationHtml } from '../../../lib/quotationDocument'
 import { DEFAULT_QUOTATION_TERMS, DEFAULT_QUOTATION_NOTES } from '../../../lib/quotationDefaults'
+import { getQuotationSaveRequestDetails } from '../../../lib/quotationClientHelpers'
 
 export default function QuotationBuilder({ quotationId }){
-  const [data, setData] = useState({ boq: [], paymentSchedule: [], terms: DEFAULT_QUOTATION_TERMS, notes: DEFAULT_QUOTATION_NOTES, attachments: [], subtotal:0, gstTotal:0, discount:0, grandTotal:0 })
+  const router = useRouter()
+  const enquiryIdFromQuery = typeof router.query?.enquiryId === 'string'
+    ? router.query.enquiryId
+    : Array.isArray(router.query?.enquiryId)
+      ? router.query.enquiryId[0]
+      : null
+
+  const [data, setData] = useState({ boq: [], paymentSchedule: [], terms: DEFAULT_QUOTATION_TERMS, notes: DEFAULT_QUOTATION_NOTES, attachments: [], subtotal:0, gstTotal:0, gstPercent:0, discount:0, discountPercent:0, subtotalAfterDiscount:0, grandTotal:0 })
+  const [customProjectTypeEnabled, setCustomProjectTypeEnabled] = useState(false)
+  const projectTypeOptions = ['Individual House','Duplex House','Luxury Villa','Apartment','Commercial Building','Office Interior','Shop Interior','Renovation','Turnkey Construction','Interior Design']
   const [settings, setSettings] = useState({})
   const [servicesList, setServicesList] = useState([])
   const [validationErrors, setValidationErrors] = useState({})
@@ -16,6 +27,7 @@ export default function QuotationBuilder({ quotationId }){
   const [showPreview, setShowPreview] = useState(false)
   const [currentId, setCurrentId] = useState(quotationId || null)
   const [unsaved, setUnsaved] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
   const previewIframeRef = useRef(null)
   
   // New structured BOQ state for Work Blocks
@@ -23,6 +35,31 @@ export default function QuotationBuilder({ quotationId }){
 
   // Basic helpers and stubs used by the UI and HTML generator
   function setField(key, value){ setData(prev=>({ ...prev, [key]: value })) }
+  const calculateSectionTotal = (block = {}) => {
+    return (block.measurements || []).reduce((sum, meas) => {
+      const quantity = Number(meas.quantity || 0)
+      const rate = Number(meas.rate || 0)
+      return sum + (quantity * rate)
+    }, 0)
+  }
+  const calculateBoqTotal = (blocks = workBlocks) => {
+    return (blocks || []).reduce((sum, block) => sum + calculateSectionTotal(block), 0)
+  }
+  const isCustomProjectTypeValue = (value) => {
+    const normalized = String(value || '').trim()
+    return Boolean(normalized) && !projectTypeOptions.includes(normalized)
+  }
+  function handleProjectTypeChange(value){
+    if (value === 'Others') {
+      setCustomProjectTypeEnabled(true)
+      const currentValue = String(data.projectType || '').trim()
+      setField('projectType', isCustomProjectTypeValue(currentValue) ? currentValue : '')
+      return
+    }
+
+    setCustomProjectTypeEnabled(false)
+    setField('projectType', value)
+  }
   function updateBoqRow(idx, field, value){ setData(prev=>{ const b = [...(prev.boq||[])]; b[idx] = { ...(b[idx]||{}), [field]: value }; return { ...prev, boq: b } }) }
   function addBoqRow(){ setData(prev=>({ ...prev, boq: [...(prev.boq||[]), { id: Date.now(), description:'', category:'', unit:'', quantity:0, rate:0, gst:0, amount:0 }] })) }
   function deleteBoqRow(idx){ setData(prev=>{ const b = [...(prev.boq||[])]; b.splice(idx,1); return { ...prev, boq: b } }) }
@@ -131,8 +168,54 @@ export default function QuotationBuilder({ quotationId }){
     setData(prev=>({ ...prev, boq: flatBoq }))
   }
 
+  function buildWorkBlocksFromBoq(flatBoq = []){
+    const byCategory = flatBoq.reduce((acc, row) => {
+      const category = String(row?.category || 'General').trim() || 'General'
+      if (!acc[category]) acc[category] = []
+      acc[category].push(row)
+      return acc
+    }, {})
+
+    return Object.entries(byCategory).map(([category, rows], idx) => ({
+      id: `work-${idx}-${category}`,
+      title: category,
+      descriptions: [],
+      materials: [],
+      warranty: '',
+      expanded: true,
+      measurements: (rows || []).map((row, rowIdx) => ({
+        id: row.id || `${category}-${rowIdx}`,
+        description: String(row.description || ''),
+        unit: String(row.unit || ''),
+        quantity: Number(row.quantity || 0),
+        rate: Number(row.rate || 0),
+        amount: Number(row.amount || 0),
+      })),
+    }))
+  }
+
   function formatCurrency(n){ return Number(n||0).toFixed(2) }
   function openAttachments(){ /* stub: open attachment manager */ }
+
+  function getPrefilledServices(selectedService, serviceList = []) {
+    const normalized = String(selectedService || '').trim().toLowerCase()
+    if (!normalized) return []
+
+    for (const service of serviceList) {
+      const candidates = [service?.id, service?.title, service?.name, service?.serviceName, service?.serviceTitle]
+      for (const candidate of candidates) {
+        if (String(candidate || '').trim().toLowerCase() === normalized) {
+          return [service?.id || candidate]
+        }
+      }
+    }
+
+    return [selectedService]
+  }
+
+  useEffect(() => {
+    setCustomProjectTypeEnabled(prev => prev || isCustomProjectTypeValue(data.projectType))
+  }, [data.projectType])
 
   useEffect(()=>{
     let mounted = true
@@ -146,34 +229,61 @@ export default function QuotationBuilder({ quotationId }){
 
         const servicesRes = await fetch('/api/services?status=ACTIVE')
         const servicesJson = await servicesRes.json()
-        if (servicesJson && servicesJson.success && mounted){
-          setServicesList(Array.isArray(servicesJson.data) ? servicesJson.data : [])
+        const servicesData = servicesJson && servicesJson.success ? (Array.isArray(servicesJson.data) ? servicesJson.data : []) : []
+        if (mounted){
+          setServicesList(servicesData)
         }
 
-        if (quotationId){
+          if (quotationId){
           const res = await fetch('/api/quotations/' + quotationId)
           const d = await res.json()
           if (d && d.success && mounted){
+            const loadedBoq = Array.isArray(d.data?.boq) ? d.data.boq : []
             setData(prev => ({
               ...prev,
               ...(d.data || {}),
+              boq: loadedBoq,
               terms: Array.isArray(d.data?.terms) ? d.data.terms : [],
               notes: String(d.data?.notes || ''),
             }))
+            setWorkBlocks(buildWorkBlocksFromBoq(loadedBoq))
             setCurrentId(quotationId)
           }
+          return
         }
+
+        const enquiryIdToUse = enquiryIdFromQuery
+        if (!enquiryIdToUse) return
+
+        const enquiryRes = await fetch('/api/enquiries/' + enquiryIdToUse)
+        const enquiryJson = await enquiryRes.json()
+        const enquiryData = enquiryJson && enquiryJson.success ? (enquiryJson.data || null) : enquiryJson
+
+        if (!mounted || !enquiryData) return
+
+        setData(prev => ({
+          ...prev,
+          enquiryId: enquiryIdToUse,
+          customerName: enquiryData.customerName || prev.customerName || '',
+          customerPhone: enquiryData.phone || prev.customerPhone || '',
+          customerEmail: enquiryData.email || prev.customerEmail || '',
+          siteAddress: enquiryData.location || prev.siteAddress || '',
+          projectName: enquiryData.service ? `${enquiryData.customerName || 'Customer'} - ${enquiryData.service}` : prev.projectName || '',
+          projectType: enquiryData.service || prev.projectType || '',
+          services: getPrefilledServices(enquiryData.service, servicesData),
+          notes: enquiryData.message || prev.notes || '',
+        }))
       }catch(err){
         console.error('Failed to load settings or quotation data:', err)
       }
     }
     loadData()
     return ()=>{ mounted = false }
-  }, [quotationId])
+  }, [quotationId, enquiryIdFromQuery])
 
   useEffect(() => {
     computeTotals()
-  }, [data.boq, data.discount])
+  }, [data.boq, data.discountPercent])
 
   // Sync workBlocks to boq whenever workBlocks change
   useEffect(() => {
@@ -310,7 +420,7 @@ export default function QuotationBuilder({ quotationId }){
 
   useEffect(() => {
     computeTotals()
-  }, [data.boq, data.discount])
+  }, [data.boq, data.discountPercent])
 
   function handlePreview(){ setShowPreview(true) }
 
@@ -372,18 +482,67 @@ export default function QuotationBuilder({ quotationId }){
 
   function computeTotals(){
     const boq = data.boq || []
-    let subtotal=0, gstTotal=0
-    boq.forEach(r=>{ const amt = Number(r.amount||0); const gst = Number(r.gst||0); subtotal += amt; gstTotal += (amt * gst / 100) })
-    const discount = Number(data.discount||0)
-    const grand = subtotal + gstTotal - discount
-    setData(prev=>({...prev, subtotal, gstTotal, grandTotal: grand}))
+    const subtotal = boq.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+
+    const discountPercent = Number(data.discountPercent || 0)
+    const discountAmount = subtotal * (discountPercent / 100)
+    const subtotalAfterDiscount = subtotal - discountAmount
+
+    const gstPercent = Number(data.gstPercent || 0)
+    const gstAmount = subtotalAfterDiscount * (gstPercent / 100)
+    const grand = subtotalAfterDiscount + gstAmount
+
+    setData(prev => ({
+      ...prev,
+      subtotal,
+      discount: discountAmount,
+      discountPercent,
+      subtotalAfterDiscount,
+      gstPercent,
+      gstTotal: gstAmount,
+      grandTotal: grand,
+    }))
   }
 
-  async function handleSave(status='Saved', showMessage=true){
-    const normalizedStatus = String(status || 'Saved').trim()
+  function parseHistoryMeta(meta){
+    if (!meta) return {}
+    if (typeof meta === 'object') return meta
+    try { return JSON.parse(meta) } catch { return {} }
+  }
+
+  async function refreshQuotationData(idToLoad = currentId || quotationId){
+    if (!idToLoad) return null
+
+    try {
+      const res = await fetch('/api/quotations/' + idToLoad)
+      const d = await res.json()
+      if (!d?.success || !d?.data) return null
+
+      const loadedBoq = Array.isArray(d.data?.boq) ? d.data.boq : []
+      setCurrentId(idToLoad)
+      setData(prev => ({
+        ...prev,
+        ...d.data,
+        boq: loadedBoq,
+        terms: Array.isArray(d.data?.terms) ? d.data.terms : prev.terms,
+        notes: String(d.data?.notes || prev.notes || ''),
+      }))
+      setWorkBlocks(buildWorkBlocksFromBoq(loadedBoq))
+      return d.data
+    } catch (err) {
+      console.error('Failed to refresh quotation data:', err)
+      return null
+    }
+  }
+
+  async function handleSave(status = 'Draft', showMessage=true){
+    console.log('Quotation save triggered', { status, quotationId })
+    // Read live form values first (includes DOM reads for inputs)
+    const liveData = getLiveFormData()
+
+    const normalizedStatus = String(status || 'Draft').trim()
     const isDraft = normalizedStatus.toUpperCase() === 'DRAFT'
     const allowIncompleteSave = isDraft || normalizedStatus.toUpperCase() === 'SAVED'
-    const liveData = getLiveFormData()
 
     if (!allowIncompleteSave) {
       if (!liveData.customerName || !liveData.customerPhone || !liveData.projectName) {
@@ -393,54 +552,58 @@ export default function QuotationBuilder({ quotationId }){
       if (!liveData.boq || liveData.boq.length===0) { if (showMessage) toast.error('At least one BOQ item required'); return false }
     }
 
-    const payload = {...liveData, status: normalizedStatus, isDraft: false}
+    const payload = {
+      ...liveData,
+      enquiryId: liveData.enquiryId || enquiryIdFromQuery || null,
+    }
+    // Log payload for debugging status-saving issues
+    console.log('Quotation Update Payload:', payload)
     let toastId = null
+    setSaveLoading(true)
 
     try{
       if (showMessage) toastId = toast.loading(isDraft ? 'Saving draft...' : (normalizedStatus.toUpperCase() === 'SENT' ? 'Sending...' : 'Saving...'))
 
-      if (quotationId) {
-        const res = await fetch('/api/quotations/' + quotationId, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-        const d = await res.json()
-        if (d.success){
-          setUnsaved(false)
-          if (toastId) toast.dismiss(toastId)
-          if (showMessage) {
-            const successMessage = isDraft ? 'Quotation Draft Saved Successfully' : (normalizedStatus.toUpperCase() === 'SENT' ? 'Quotation sent successfully.' : 'Quotation Saved Successfully')
-            toast.success(successMessage)
-          }
-          if (d.data && d.data.id) {
-            setCurrentId(d.data.id)
-            setTimeout(() => { window.location.href = '/admin/quotations' }, 500)
-          }
-          return true
-        } else {
-          throw new Error(d.message || 'Save failed')
+      const requestDetails = getQuotationSaveRequestDetails(quotationId, currentId)
+      const res = await fetch(requestDetails.endpoint, { method: requestDetails.method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+      const d = await res.json()
+
+      if (!d.success) {
+        throw new Error(d.message || 'Save failed')
+      }
+
+      setUnsaved(false)
+      const nextId = String(d.data?.id || requestDetails.id || '').trim()
+      if (nextId) {
+        setCurrentId(nextId)
+        const refreshed = await refreshQuotationData(nextId)
+        if (!refreshed) {
+          setData(prev => ({
+            ...prev,
+            ...d.data,
+            terms: Array.isArray(d.data?.terms) ? d.data.terms : prev.terms,
+            notes: String(d.data?.notes ?? prev.notes ?? ''),
+          }))
         }
-      } else {
-        const res = await fetch('/api/quotations', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-        const d = await res.json()
-        if (d.success){
-          setUnsaved(false)
-          if (toastId) toast.dismiss(toastId)
-          if (showMessage) {
-            const successMessage = isDraft ? 'Quotation Draft Saved Successfully' : (normalizedStatus.toUpperCase() === 'SENT' ? 'Quotation sent successfully.' : 'Quotation Saved Successfully')
-            toast.success(successMessage)
-          }
-          if (d.data && d.data.id){
-            setCurrentId(d.data.id)
-            setTimeout(() => { window.location.href = '/admin/quotations' }, 500)
-          }
-          return true
-        } else {
-          throw new Error(d.message || 'Save failed')
+        if (!requestDetails.id) {
+          await router.replace(`/admin/quotations/${nextId}`)
         }
       }
-    }catch(err){
+
+      if (toastId) toast.dismiss(toastId)
+      if (showMessage) {
+        toast.success('Quotation saved successfully.')
+      }
+
+      return true
+    } catch(err){
       console.error('Save error:', err)
       if (toastId) toast.dismiss(toastId)
-      if (showMessage) toast.error('Unable to save: ' + err.message)
+      if (showMessage) toast.error('Unable to save: ' + (err?.message || 'An unknown error occurred'))
+    } finally {
+      setSaveLoading(false)
     }
+
     return false
   }
 
@@ -540,19 +703,28 @@ export default function QuotationBuilder({ quotationId }){
           <h3 className="font-semibold mb-2">Section 2 — Project Information</h3>
           <div className="grid grid-cols-2 gap-3">
             <input value={data.projectName} onChange={(e)=>setField('projectName', e.target.value)} placeholder="Project Name *" className={"border p-2 rounded " + (validationErrors.projectName ? 'border-red-500' : '')} />
-            <select value={data.projectType} onChange={(e)=>setField('projectType', e.target.value)} className="border p-2 rounded">
-              <option value="">Select Project Type *</option>
-              <option>Individual House</option>
-              <option>Duplex House</option>
-              <option>Luxury Villa</option>
-              <option>Apartment</option>
-              <option>Commercial Building</option>
-              <option>Office Interior</option>
-              <option>Shop Interior</option>
-              <option>Renovation</option>
-              <option>Turnkey Construction</option>
-              <option>Interior Design</option>
-            </select>
+            <div className="space-y-2">
+              <select value={customProjectTypeEnabled ? 'Others' : (data.projectType || '')} onChange={(e)=>handleProjectTypeChange(e.target.value)} className="border p-2 rounded w-full">
+                <option value="">Select Scope of Project *</option>
+                <option>Individual House</option>
+                <option>Duplex House</option>
+                <option>Luxury Villa</option>
+                <option>Apartment</option>
+                <option>Commercial Building</option>
+                <option>Office Interior</option>
+                <option>Shop Interior</option>
+                <option>Renovation</option>
+                <option>Turnkey Construction</option>
+                <option>Interior Design</option>
+                <option>Others</option>
+              </select>
+              {customProjectTypeEnabled && (
+                <div className="space-y-1">
+                  <label className="text-sm text-gray-700">Custom Project Scope</label>
+                  <input value={data.projectType || ''} onChange={(e)=>setField('projectType', e.target.value)} placeholder="Enter project scope" className="border p-2 rounded w-full" />
+                </div>
+              )}
+            </div>
             <input value={data.projectLocation} onChange={(e)=>setField('projectLocation', e.target.value)} placeholder="Project Location" className="border p-2 rounded" />
             <input value={data.plotArea} onChange={(e)=>setField('plotArea', e.target.value)} placeholder="Plot Area" className="border p-2 rounded" />
             <input value={data.builtUpArea} onChange={(e)=>setField('builtUpArea', e.target.value)} placeholder="Built-up Area" className="border p-2 rounded" />
@@ -747,11 +919,13 @@ export default function QuotationBuilder({ quotationId }){
                         <Plus className="w-4 h-4" /> Add Measurement Row
                       </button>
                     </div>
+                    <div className="flex justify-end pt-2 font-semibold">
+                      Section Total: {formatCurrency(calculateSectionTotal(block))}
+                    </div>
                   </div>
                 )}
               </div>
             ))}
-            
             <button type="button" onClick={addWorkBlock} className="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg inline-flex items-center justify-center gap-2 font-medium">
               <Plus className="w-5 h-5" /> Add Work
             </button>
@@ -759,9 +933,12 @@ export default function QuotationBuilder({ quotationId }){
 
           <div className="mt-4 space-y-1 text-sm">
             <div>Subtotal: {formatCurrency(data.subtotal)}</div>
-            <div>GST Total: {formatCurrency(data.gstTotal)}</div>
-            <div className="flex items-center gap-2">Discount: <input type="number" value={data.discount||0} onChange={(e)=>setField('discount', Number(e.target.value))} className="border p-1 w-32" /></div>
-            <div className="font-semibold">Grand Total: {formatCurrency(data.grandTotal)}</div>
+            <div className="flex items-center gap-2">Discount %: <input type="number" value={data.discountPercent || 0} onChange={(e)=>setField('discountPercent', Number(e.target.value))} className="border p-1 w-32" /></div>
+            <div>Discount Amount: {formatCurrency(data.discount || 0)}</div>
+            <div>Subtotal After Discount: {formatCurrency(data.subtotalAfterDiscount || 0)}</div>
+            <div className="flex items-center gap-2">GST %: <input type="number" value={data.gstPercent || 0} onChange={(e)=>setField('gstPercent', Number(e.target.value))} className="border p-1 w-32" /></div>
+            <div>GST Amount: {formatCurrency(data.gstTotal || 0)}</div>
+            <div className="font-semibold">Grand Total: {formatCurrency(data.grandTotal || 0)}</div>
           </div>
         </div>
 
@@ -806,15 +983,47 @@ export default function QuotationBuilder({ quotationId }){
           </div>
         </div>
 
+        <div className="bg-white p-4 rounded">
+          <h3 className="font-semibold mb-2">Quotation Status History</h3>
+          {Array.isArray(data.histories) && data.histories.length > 0 ? (
+            <div className="space-y-3">
+              {data.histories.map((history) => {
+                const meta = parseHistoryMeta(history.meta)
+                const previousStatus = meta.previousStatus || meta.status || ''
+                const newStatus = meta.newStatus || meta.status || ''
+                const historyLabel = history.action === 'STATUS_CHANGED'
+                  ? previousStatus && newStatus && previousStatus !== newStatus
+                    ? `Status changed from ${previousStatus} to ${newStatus}`
+                    : `Status changed to ${newStatus}`
+                  : history.action
+
+                return (
+                  <div key={history.id} className="border rounded p-3 bg-gray-50">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="font-semibold">{historyLabel}</div>
+                      <div className="text-xs text-gray-500">{new Date(history.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="text-sm text-gray-600">Updated by: {history.adminName || 'System'}</div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600">No status change history recorded yet.</div>
+          )}
+        </div>
+
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2 flex-wrap">
-              <button onClick={()=>handleSave('Saved')} className="px-4 py-2 bg-emerald-600 text-white rounded">Save</button>
-              <button onClick={handlePreview} className="px-4 py-2 border rounded">Preview</button>
-              <button onClick={downloadPdf} disabled={downloadLoading} className="px-4 py-2 border rounded inline-flex items-center gap-2">
+              <button type="button" onClick={() => { console.log('Save button clicked'); handleSave() }} disabled={saveLoading} className="px-4 py-2 bg-emerald-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{saveLoading ? 'Saving...' : 'Save'}</button>
+              <button type="button" onClick={() => { console.log('Preview button clicked'); handlePreview() }} className="px-4 py-2 border rounded">Preview</button>
+              <button type="button" onClick={downloadPdf} disabled={downloadLoading} className="px-4 py-2 border rounded inline-flex items-center gap-2">
                 <Download className="w-4 h-4" /> {downloadLoading ? 'Generating...' : 'Download PDF'}
               </button>
-              <button onClick={handlePrint} className="px-4 py-2 border rounded inline-flex items-center gap-2"><Printer /> Print</button>
+              <button type="button" onClick={handlePrint} className="px-4 py-2 border rounded inline-flex items-center gap-2"><Printer /> Print</button>
+            </div>
+            <div className="flex gap-2 items-center flex-wrap">
             </div>
             <div className="flex gap-2 flex-wrap">
               <button onClick={handleSendEmail} disabled={emailLoading} className="px-3 py-2 border rounded inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Mail /> {emailLoading ? 'Sending...' : 'Send Email'}</button>

@@ -37,26 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const quotationNumber = String(existing.quotationNumber || '').trim() || (await generateQuotationNumber())
       const payload = await serializeQuotationPayload(body, { quotationNumber })
-      const updated = await prisma.$transaction(async (tx) => {
-        const quotation = await tx.quotation.update({ where: { id }, data: payload })
-
-        if (payload.status && payload.status.toString().toUpperCase() === 'SENT') {
-          try {
-            await tx.quotationHistory.create({
-              data: {
-                quotationId: quotation.id,
-                action: 'SENT',
-                adminName: session.user?.name || session.user?.email || '',
-                meta: JSON.stringify({ sentAt: new Date().toISOString() }),
-              }
-            })
-          } catch (historyErr) {
-            console.warn('Quotation history entry could not be created:', historyErr)
-          }
-        }
-
-        return quotation
-      })
+      const updated = await prisma.quotation.update({ where: { id }, data: payload })
       return res.status(200).json(response(true, normalizeQuotationRecord(updated), 'Quotation updated'))
     } catch (err: any) {
       console.error('PUT /api/quotations/:id', err)
@@ -66,30 +47,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'DELETE') {
     try {
-      // Use raw SQL to disable foreign key constraints for this deletion
-      await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF')
-      
-      // Delete all child records first to avoid constraint violations
-      await prisma.quotationHistory.deleteMany({ where: { quotationId: id } })
-      await prisma.quotationItem.deleteMany({ where: { quotationId: id } })
-      await prisma.quotationMaterial.deleteMany({ where: { quotationId: id } })
-      await prisma.quotationTerm.deleteMany({ where: { quotationId: id } })
-      await prisma.quotationAttachment.deleteMany({ where: { quotationId: id } })
-      await prisma.quotationPaymentStage.deleteMany({ where: { quotationId: id } })
-      await prisma.quotationWarranty.deleteMany({ where: { quotationId: id } })
-      
-      // Finally delete the parent quotation
-      await prisma.quotation.delete({ where: { id } })
-      
-      // Re-enable foreign key constraints
-      await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON')
-      
-      return res.status(200).json(response(true, null, 'Deleted'))
+      const quotationId = Array.isArray(id) ? id[0] : id
+      if (!quotationId) return res.status(400).json(response(false, null, 'Invalid quotation id'))
+
+      const existing = await prisma.quotation.findUnique({ where: { id: quotationId } })
+      if (!existing) {
+        return res.status(404).json(response(false, null, 'Not found'))
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.quotationHistory.deleteMany({ where: { quotationId } })
+        await tx.quotationItem.deleteMany({ where: { quotationId } })
+        await tx.quotationMaterial.deleteMany({ where: { quotationId } })
+        await tx.quotationTerm.deleteMany({ where: { quotationId } })
+        await tx.quotationAttachment.deleteMany({ where: { quotationId } })
+        await tx.quotationPaymentStage.deleteMany({ where: { quotationId } })
+        await tx.quotationWarranty.deleteMany({ where: { quotationId } })
+        await tx.quotation.delete({ where: { id: quotationId } })
+      })
+
+      return res.status(200).json(response(true, null, 'Quotation deleted successfully.'))
     } catch (err: any) {
       console.error('DELETE /api/quotations/:id', err)
-      // Try to re-enable foreign keys even on error
-      await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON').catch(() => {})
-      return res.status(500).json(response(false, null, `Failed to delete quotation: ${err.message}`))
+      return res.status(500).json(response(false, null, err.message || 'Failed to delete quotation'))
     }
   }
 

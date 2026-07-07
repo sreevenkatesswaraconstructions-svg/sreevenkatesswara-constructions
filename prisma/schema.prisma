@@ -49,18 +49,57 @@ model Enquiry {
   id           String   @id @default(cuid())
   customerName String
   phone        String
-  email        String
+  email        String?
   service      String
   budget       String?
   location     String?
-  message      String
-  status       String   @default("NEW")
+  message      String?
+  status       String   @default("New")
+  source       String   @default("Website")
+  createdBy    String   @default("Website")
   isContacted  Boolean  @default(false)
+  followUpDate DateTime?
+  followUpTime String?
+  followUpNotes String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  activities   EnquiryActivity[]
+  quotations   Quotation[]
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId   String?
+
   @@index([status])
+  @@index([source])
+  @@index([createdBy])
   @@index([createdAt])
+  @@index([customerId])
+}
+
+model EnquiryActivity {
+  id           String   @id @default(cuid())
+  enquiry      Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  enquiryId    String
+  activity     String
+  performedBy  String   @default("System")
+  createdAt    DateTime @default(now())
+
+  @@index([enquiryId])
+  @@index([createdAt])
+}
+
+model Customer {
+  id         String      @id @default(cuid())
+  name       String
+  phone      String      @unique
+  email      String?
+  location   String?
+  enquiries  Enquiry[]
+  quotations Quotation[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([phone])
 }
 
 // Project model for project management
@@ -130,6 +169,30 @@ model Service {
   @@index([featured])
 }
 
+// Testimonial model for customer reviews management
+model Testimonial {
+  id               String   @id @default(cuid())
+  customerName     String
+  customerEmail    String?
+  customerPhone    String?
+  customerLocation String
+  customerRole     String?
+  reviewMessage    String
+  rating           Int      @default(5)
+  customerPhoto    String?
+  status           String   @default("Pending")
+  isFeatured       Boolean  @default(false)
+  displayOrder     Int      @default(0)
+  adminNotes       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status])
+  @@index([isFeatured])
+  @@index([displayOrder])
+  @@index([createdAt])
+}
+
 // Analytics model for visitor tracking
 model Analytics {
   id     String   @id @default(cuid())
@@ -174,6 +237,10 @@ model EmailLog {
 model Quotation {
   id                String   @id @default(cuid())
   quotationNumber   String   @unique
+  enquiryId         String?
+  enquiry           Enquiry? @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName      String
   customerPhone     String
   customerEmail     String
@@ -215,6 +282,7 @@ model Quotation {
 
   @@index([status])
   @@index([createdAt])
+  @@index([enquiryId])
 }
 
 // Detailed items for BOQ (structured)

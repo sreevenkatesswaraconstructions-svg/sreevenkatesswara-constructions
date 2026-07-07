@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import * as XLSX from 'xlsx'
 import PDFDocument from 'pdfkit'
 import { format } from 'date-fns'
+import { normalizeEnquiryStatus, normalizeEnquirySource, normalizeEnquiryCreatedBy } from '../../../lib/enquiryUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -34,13 +35,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const worksheet = XLSX.utils.json_to_sheet(
         enquiries.map((e) => ({
           'Customer Name': e.customerName,
-          'Email': e.email,
+          'Email': e.email || 'N/A',
           'Phone': e.phone,
           'Service': e.service,
           'Budget': e.budget || 'N/A',
           'Location': e.location || 'N/A',
           'Message': e.message || 'N/A',
-          'Status': e.status,
+          'Source': normalizeEnquirySource(e.source),
+          'Status': normalizeEnquiryStatus(e.status),
+          'Created By': normalizeEnquiryCreatedBy(e.createdBy),
           'Contacted': e.isContacted ? 'Yes' : 'No',
           'Date': format(new Date(e.createdAt), 'yyyy-MM-dd HH:mm:ss'),
         }))

@@ -11,13 +11,11 @@ export const DEFAULT_QUOTATION_TERMS = [
   '8.We are committed to delivering quality workmanship, transparent pricing and professional project execution throughout the construction process.',
 ]
 
-
 export type QuotationPayload = Record<string, any>
 
 const normalizeStatus = (status?: string | null) => {
   const raw = String(status ?? 'Saved').trim().toUpperCase()
-  if (['SAVED', 'SAVE', 'SAVING'].includes(raw)) return 'Saved'
-  if (['DRAFT', 'D', 'DRAFTED'].includes(raw)) return 'Saved'
+  if (['SAVED', 'SAVE', 'SAVING', 'DRAFT', 'D', 'DRAFTED'].includes(raw)) return 'Saved'
   if (['SENT', 'SEND', 'SENT_EMAIL', 'SUBMITTED'].includes(raw)) return 'Sent'
   return 'Saved'
 }
@@ -50,8 +48,45 @@ const parseJsonField = (value: any, fallback: any = null) => {
   return value
 }
 
+export const getQuotationSaveRequestDetails = (quotationId?: string | null, currentId?: string | null) => {
+  const resolvedId = String(quotationId || currentId || '').trim()
+  return {
+    id: resolvedId,
+    endpoint: resolvedId ? `/api/quotations/${resolvedId}` : '/api/quotations',
+    method: resolvedId ? 'PUT' : 'POST',
+  }
+}
+
+export const calculateQuotationTotals = (boqRows: Array<Record<string, any>> = [], discountPercent = 0) => {
+  const resolvedDiscountPercent = Number(discountPercent || 0)
+  const subtotal = boqRows.reduce((sum, row: any) => sum + Number(row?.amount || 0), 0)
+  const discount = subtotal * (resolvedDiscountPercent / 100)
+  const subtotalAfterDiscount = subtotal - discount
+  const gstTotal = boqRows.reduce((sum, row: any) => {
+    const amount = Number(row?.amount || 0)
+    const discountedAmount = amount - (amount * (resolvedDiscountPercent / 100))
+    const gstRate = Number(row?.gst || 0)
+    return sum + (discountedAmount * gstRate / 100)
+  }, 0)
+  const gstPercent = subtotalAfterDiscount > 0 ? (gstTotal / subtotalAfterDiscount) * 100 : 0
+  return {
+    subtotal,
+    discountPercent: resolvedDiscountPercent,
+    discount,
+    subtotalAfterDiscount,
+    gstPercent,
+    gstTotal,
+    grandTotal: subtotalAfterDiscount + gstTotal,
+  }
+}
+
 export const serializeQuotationPayload = async (input: QuotationPayload = {}, options: { quotationNumber?: string } = {}) => {
   const rawStatus = normalizeStatus(input?.status)
+  const subtotalInput = parseNumber(input?.subtotal, 0)
+  const discountPercentInput = input?.discountPercent !== undefined && input?.discountPercent !== null
+    ? parseNumber(input?.discountPercent, 0)
+    : (subtotalInput > 0 ? (parseNumber(input?.discount, 0) / subtotalInput) * 100 : parseNumber(input?.discount, 0))
+  const totals = calculateQuotationTotals(Array.isArray(input?.boq) ? input.boq : [], discountPercentInput)
   const payload = {
     quotationNumber: (input?.quotationNumber || options.quotationNumber || '').toString().trim(),
     customerName: String(input?.customerName ?? '').trim(),
@@ -76,10 +111,10 @@ export const serializeQuotationPayload = async (input: QuotationPayload = {}, op
     terms: serializeField(input?.terms),
     notes: String(input?.notes ?? '').trim(),
     attachments: serializeField(input?.attachments),
-    subtotal: parseNumber(input?.subtotal, 0),
-    gstTotal: parseNumber(input?.gstTotal, 0),
-    discount: parseNumber(input?.discount, 0),
-    grandTotal: parseNumber(input?.grandTotal, 0),
+    subtotal: parseNumber(input?.subtotal, totals.subtotal),
+    gstTotal: parseNumber(input?.gstTotal, totals.gstTotal),
+    discount: parseNumber(input?.discount, totals.discount),
+    grandTotal: parseNumber(input?.grandTotal, totals.grandTotal),
     isDraft: false,
   }
 
@@ -123,6 +158,7 @@ export const normalizeQuotationRecord = (record: any) => {
   if (!record) return null
   return {
     ...record,
+    status: normalizeStatus(record.status),
     services: parseJsonField(record.services, []),
     boq: parseJsonField(record.boq, []),
     paymentSchedule: parseJsonField(record.paymentSchedule, []),

@@ -21,6 +21,7 @@ const menuItems = [
   { name: 'Projects', icon: FolderKanban, path: '/admin/projects' },
   { name: 'Blogs', icon: FileText, path: '/admin/blogs' },
   { name: 'Services', icon: Building2, path: '/admin/services' },
+  { name: 'Testimonials', icon: MessageSquare, path: '/admin/testimonials' },
   { name: 'Upload Manager', icon: Upload, path: '/admin/uploads' },
   { name: 'Activity Log', icon: FileText, path: '/admin/activity-log' },
   { name: 'Settings', icon: Settings, path: '/admin/settings' },

@@ -24,7 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { customerEmail: { contains: search, mode: 'insensitive' } },
         ]
       }
-      if (status) where.status = status
+      if (status) {
+        where.status = status
+      }
       if (dateFrom || dateTo) {
         where.createdAt = {}
         if (dateFrom) where.createdAt.gte = new Date(dateFrom)
@@ -32,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const [items, total] = await Promise.all([
-        prisma.quotation.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+        prisma.quotation.findMany({ where, orderBy: { updatedAt: 'desc' }, skip, take }),
         prisma.quotation.count({ where }),
       ])
 
@@ -55,26 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const quotationNumber = String(body.quotationNumber || '').trim() || (await generateQuotationNumber())
       const payload = await serializeQuotationPayload(body, { quotationNumber })
-      const created = await prisma.$transaction(async (tx) => {
-        const quotation = await tx.quotation.create({ data: payload })
-
-        if (payload.status && payload.status.toString().toUpperCase() === 'SENT') {
-          try {
-            await tx.quotationHistory.create({
-              data: {
-                quotationId: quotation.id,
-                action: 'SENT',
-                adminName: session.user?.name || session.user?.email || '',
-                meta: JSON.stringify({ sentAt: new Date().toISOString() }),
-              }
-            })
-          } catch (historyErr) {
-            console.warn('Quotation history entry could not be created:', historyErr)
-          }
-        }
-
-        return quotation
-      })
+      const created = await prisma.quotation.create({ data: payload })
 
       return res.status(201).json(response(true, normalizeQuotationRecord(created), 'Quotation created'))
     } catch (err: any) {

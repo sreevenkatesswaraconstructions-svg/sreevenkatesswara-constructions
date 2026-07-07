@@ -72,7 +72,7 @@ export default function Form({ fields, onSubmit, initialValues = {}, submitText 
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </label>
 
-          {field.type === 'text' || field.type === 'email' || field.type === 'tel' ? (
+          {field.type === 'text' || field.type === 'email' || field.type === 'tel' || field.type === 'date' || field.type === 'time' ? (
             <input
               type={field.type}
               value={formData[field.name] || ''}

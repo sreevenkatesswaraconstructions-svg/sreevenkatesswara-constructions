@@ -4,6 +4,8 @@ import { sendEnquiryEmails } from '../../../lib/email'
 import { sendEnquiryAcknowledgement } from '../../../lib/enquiryAutoReply'
 import { sendEnquiryWhatsAppMessages } from '../../../lib/whatsapp'
 import { createNotification } from '../../../lib/notifications'
+import { normalizeEnquiryStatus, normalizeEnquirySource, normalizeEnquiryCreatedBy } from '../../../lib/enquiryUtils'
+import { addEnquiryActivity } from '../../../lib/enquiryTimeline'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -13,7 +15,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const where: any = {}
       
       if (status) {
-        where.status = status as string
+        const requestedStatus = status as string
+        const normalizedStatus = normalizeEnquiryStatus(requestedStatus)
+        const variants = [requestedStatus, normalizedStatus]
+
+        if (normalizedStatus === 'New') {
+          variants.push('NEW', 'PENDING')
+        } else if (normalizedStatus === 'Follow-up') {
+          variants.push('IN_PROGRESS', 'FOLLOW-UP')
+        } else if (normalizedStatus === 'Won') {
+          variants.push('COMPLETED')
+        } else if (normalizedStatus === 'Lost') {
+          variants.push('CLOSED')
+        }
+
+        where.status = { in: variants }
       }
       
       if (search) {
@@ -21,7 +37,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { customerName: { contains: search as string, mode: 'insensitive' } },
           { email: { contains: search as string, mode: 'insensitive' } },
           { phone: { contains: search as string, mode: 'insensitive' } },
-          { service: { contains: search as string, mode: 'insensitive' } }
+          { service: { contains: search as string, mode: 'insensitive' } },
+          { source: { contains: search as string, mode: 'insensitive' } },
+          { createdBy: { contains: search as string, mode: 'insensitive' } },
+          { status: { contains: search as string, mode: 'insensitive' } }
         ]
       }
 
@@ -44,32 +63,87 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     try {
-      console.log('[ENQUIRY] Received payload:', req.body)
-      const { customerName, phone, email, service, budget, location, message } = req.body
+      const rawBody = typeof req.body === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(req.body)
+            } catch {
+              return {}
+            }
+          })()
+        : req.body || {}
 
-      if (!customerName || !phone || !email || !service) {
-        console.log('[ENQUIRY] Missing required fields:', { customerName, phone, email, service })
+      console.log('[ENQUIRY] Received payload:', rawBody)
+      const {
+        customerName,
+        phone,
+        email,
+        service,
+        budget,
+        location,
+        message,
+        notes,
+        status,
+        source,
+        createdBy,
+        performedBy,
+        followUpDate,
+        followUpTime,
+        followUpNotes,
+      } = rawBody
+
+      const trimmedCustomerName = typeof customerName === 'string' ? customerName.trim() : ''
+      const trimmedPhone = typeof phone === 'string' ? phone.trim() : ''
+      const trimmedEmail = typeof email === 'string' ? email.trim() : ''
+      const trimmedService = typeof service === 'string' ? service.trim() : ''
+      const trimmedMessage = typeof message === 'string' ? message : typeof notes === 'string' ? notes : ''
+
+      if (!trimmedCustomerName || !trimmedPhone || !trimmedService) {
+        console.log('[ENQUIRY] Missing required fields:', { customerName: trimmedCustomerName, phone: trimmedPhone, email: trimmedEmail, service: trimmedService })
         return res.status(400).json({ error: 'Missing required fields' })
       }
+
+      const normalizedStatus = normalizeEnquiryStatus(status)
+      const normalizedSource = normalizeEnquirySource(source)
+      const normalizedCreatedBy = normalizeEnquiryCreatedBy(createdBy)
+      const isManualEnquiry = normalizedCreatedBy === 'Admin'
+      const shouldSendExternalNotifications = !isManualEnquiry && normalizedCreatedBy === 'Website' && normalizedSource === 'Website'
 
       console.log('[ENQUIRY] Creating enquiry...')
       const enquiry = await prisma.enquiry.create({
         data: {
-          customerName,
-          phone,
-          email,
-          service,
-          budget: budget || null,
-          location: location || null,
-          message: message || null
+          customerName: trimmedCustomerName,
+          phone: trimmedPhone,
+          email: trimmedEmail || null,
+          service: trimmedService,
+          budget: typeof budget === 'string' && budget.trim() ? budget.trim() : null,
+          location: typeof location === 'string' && location.trim() ? location.trim() : null,
+          message: trimmedMessage || null,
+          status: normalizedStatus,
+          source: normalizedSource,
+          createdBy: normalizedCreatedBy,
+          followUpDate: followUpDate ? new Date(followUpDate as string) : null,
+          followUpTime: typeof followUpTime === 'string' && followUpTime.trim() ? followUpTime.trim() : null,
+          followUpNotes: typeof followUpNotes === 'string' && followUpNotes.trim() ? followUpNotes.trim() : null
         }
       })
+
+      await addEnquiryActivity({
+        enquiryId: enquiry.id,
+        activity: 'Enquiry Created',
+        performedBy: typeof performedBy === 'string' && performedBy.trim() ? performedBy.trim() : (normalizedCreatedBy === 'Admin' ? 'Admin' : 'System')
+      })
       console.log('[ENQUIRY] Enquiry created:', enquiry.id)
+
+      if (isManualEnquiry) {
+        console.log('[ENQUIRY] Manual enquiry created without external notifications')
+        return res.status(201).json(enquiry)
+      }
 
       // Create notification
       await createNotification({
         title: 'New Enquiry Received',
-        message: `${customerName} has submitted an enquiry for ${service}`,
+        message: `${trimmedCustomerName} has submitted an enquiry for ${trimmedService}`,
         type: 'info',
         link: '/admin/enquiries'
       })
@@ -79,71 +153,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let customerEmailSent = false
       let emailErrorReason: string | null = null
 
-      try {
-        console.log('[ENQUIRY] Sending admin notification email...')
-        // Send admin notification
-        const emailResult = await sendEnquiryEmails({
-          name: customerName,
-          email: email,
-          phone: phone,
-          service: service,
-          message: message || '',
-          budget: budget || '',
-          enquiryId: enquiry.id
-        })
-        
-        if (emailResult.admin && emailResult.admin.success) {
-          adminEmailSent = true
-          console.log('[ENQUIRY] ✅ Admin notification email sent successfully')
-        } else {
-          console.error('[ENQUIRY] ❌ Admin notification email failed:', emailResult.admin?.error)
+      if (shouldSendExternalNotifications) {
+        try {
+          console.log('[ENQUIRY] Sending admin notification email...')
+          const emailResult = await sendEnquiryEmails({
+            name: trimmedCustomerName,
+            email: trimmedEmail,
+            phone: trimmedPhone,
+            service: trimmedService,
+            message: trimmedMessage || '',
+            budget: typeof budget === 'string' ? budget : '',
+            enquiryId: enquiry.id
+          })
+          
+          if (emailResult.admin && emailResult.admin.success) {
+            adminEmailSent = true
+            console.log('[ENQUIRY] ✅ Admin notification email sent successfully')
+          } else {
+            console.error('[ENQUIRY] ❌ Admin notification email failed:', emailResult.admin?.error)
+          }
+        } catch (adminEmailError) {
+          console.error('[ENQUIRY] ❌ Admin email sending failed with exception:', adminEmailError)
         }
-      } catch (adminEmailError) {
-        console.error('[ENQUIRY] ❌ Admin email sending failed with exception:', adminEmailError)
-      }
 
-      try {
-        console.log('[ENQUIRY] Sending intelligent customer acknowledgement email...')
-        console.log('[ENQUIRY] Customer email:', email)
-        // Send intelligent customer acknowledgement email
-        const autoReplyResult = await sendEnquiryAcknowledgement({
-          id: enquiry.id,
-          customerName: customerName,
-          email: email,
-          service: service,
-          location: location || null,
-          message: message || null
-        })
-        
-        if (autoReplyResult.success) {
-          customerEmailSent = true
-          console.log('[ENQUIRY] ✅ Customer acknowledgement email sent successfully')
-        } else {
+        try {
+          console.log('[ENQUIRY] Sending intelligent customer acknowledgement email...')
+          console.log('[ENQUIRY] Customer email:', trimmedEmail)
+          const autoReplyResult = await sendEnquiryAcknowledgement({
+            id: enquiry.id,
+            customerName: trimmedCustomerName,
+            email: trimmedEmail,
+            service: trimmedService,
+            location: typeof location === 'string' ? location : null,
+            message: trimmedMessage || null
+          })
+          
+          if (autoReplyResult.success) {
+            customerEmailSent = true
+            console.log('[ENQUIRY] ✅ Customer acknowledgement email sent successfully')
+          } else {
+            customerEmailSent = false
+            emailErrorReason = autoReplyResult.error?.message || 'Unknown error'
+            console.error('[ENQUIRY] ❌ Customer acknowledgement email failed:', autoReplyResult.error)
+            console.error('[ENQUIRY] ❌ Error reason:', emailErrorReason)
+          }
+        } catch (customerEmailError) {
           customerEmailSent = false
-          emailErrorReason = autoReplyResult.error?.message || 'Unknown error'
-          console.error('[ENQUIRY] ❌ Customer acknowledgement email failed:', autoReplyResult.error)
-          console.error('[ENQUIRY] ❌ Error reason:', emailErrorReason)
+          emailErrorReason = customerEmailError instanceof Error ? customerEmailError.message : 'Unknown error'
+          console.error('[ENQUIRY] ❌ Customer email sending failed with exception:', customerEmailError)
         }
-      } catch (customerEmailError) {
-        customerEmailSent = false
-        emailErrorReason = customerEmailError instanceof Error ? customerEmailError.message : 'Unknown error'
-        console.error('[ENQUIRY] ❌ Customer email sending failed with exception:', customerEmailError)
-      }
 
-      // Send WhatsApp notification
-      try {
-        await sendEnquiryWhatsAppMessages({
-          customerName,
-          customerPhone: phone,
-          customerEmail: email,
-          service: service,
-          message: message || '',
-          budget: budget || '',
-          enquiryId: enquiry.id
-        })
-      } catch (whatsappError) {
-        console.error('[ENQUIRY] WhatsApp sending failed:', whatsappError)
-        // Continue even if WhatsApp fails
+        try {
+          await sendEnquiryWhatsAppMessages({
+            customerName: trimmedCustomerName,
+            customerPhone: trimmedPhone,
+            customerEmail: trimmedEmail,
+            service: trimmedService,
+            message: trimmedMessage || '',
+            budget: typeof budget === 'string' ? budget : '',
+            enquiryId: enquiry.id
+          })
+        } catch (whatsappError) {
+          console.error('[ENQUIRY] WhatsApp sending failed:', whatsappError)
+        }
       }
 
       // Return enquiry with email delivery status

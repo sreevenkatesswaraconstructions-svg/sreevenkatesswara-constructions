@@ -29,8 +29,12 @@ export default function QuotationsList() {
     if (!confirm('Delete this quotation?')) return
     const res = await fetch('/api/quotations/' + id, { method: 'DELETE' })
     const data = await res.json()
-    if (data.success) fetchList()
-    else alert(data.message || 'Failed to delete')
+    if (data.success) {
+      fetchList()
+      alert(data.message || 'Quotation deleted successfully.')
+    } else {
+      alert(data.message || 'Failed to delete quotation')
+    }
   }
 
   return (
@@ -49,7 +53,7 @@ export default function QuotationsList() {
         </div>
         <select value={status} onChange={(e)=>setStatus(e.target.value)} className="border px-2 py-1 rounded">
           <option value="">All Status</option>
-          <option>Saved</option>
+          <option>Draft</option>
           <option>Sent</option>
           <option>Accepted</option>
           <option>Rejected</option>

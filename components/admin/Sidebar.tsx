@@ -25,6 +25,7 @@ const menuItems = [
   { href: '/admin/projects', icon: FolderKanban, label: 'Projects' },
   { href: '/admin/blogs', icon: FileText, label: 'Blogs' },
   { href: '/admin/services', icon: Building2, label: 'Services' },
+  { href: '/admin/testimonials', icon: MessageSquare, label: 'Testimonials' },
   { href: '/admin/upload', icon: Upload, label: 'Upload Manager' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ];

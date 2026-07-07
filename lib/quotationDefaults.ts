@@ -9,4 +9,5 @@ export const DEFAULT_QUOTATION_TERMS = [
   '8.We are committed to delivering quality workmanship, transparent pricing and professional project execution throughout the construction process.',
 ]
 
+export const DEFAULT_QUOTATION_NOTES = 'Please confirm the scope and schedule before proceeding.'
 

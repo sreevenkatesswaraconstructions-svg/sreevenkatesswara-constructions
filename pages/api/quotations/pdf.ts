@@ -327,7 +327,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const projectRows = [
       { label: 'Project Name', value: quotation.projectName },
-      { label: 'Project Type', value: quotation.projectType },
+      { label: 'Scope of Project', value: quotation.projectType },
       { label: 'Location', value: quotation.projectLocation },
       { label: 'Plot Area', value: quotation.plotArea },
       { label: 'Built-up Area', value: quotation.builtUpArea },
@@ -411,7 +411,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           doc.rect(tableLeft, y, tableWidth, rowHeight).fillColor('#e2e8f0').fill()
           doc.rect(tableLeft, y, tableWidth, rowHeight).lineWidth(1).strokeColor('#64748b').stroke()
           doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b')
-          doc.text(`${category} Subtotal:`, tableLeft + 10, y + 9)
+          doc.text(`Section Total:`, tableLeft + 10, y + 9)
           doc.text(formatCurrency(subtotal), xPositions[6] + 5, y + 9, { width: columns[6] - 10, align: 'right' })
           doc.restore()
           return rowHeight
@@ -455,6 +455,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }, {})
 
         let globalSlNo = 1
+        let totalBoqValue = 0
         Object.keys(groupedBOQ).forEach((category) => {
           const categoryRows = groupedBOQ[category]
           
@@ -483,6 +484,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             categorySubtotal += Number(row.amount || 0)
           })
 
+          totalBoqValue += categorySubtotal
+
           if (tableY + 35 > doc.page.height - doc.page.margins.bottom - 40) {
             doc.addPage()
             tableY = doc.y
@@ -491,6 +494,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           tableY += subtotalRowHeight
         })
 
+        doc.save()
         doc.y = tableY + 15
       }
 
@@ -572,10 +576,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       doc.y = paymentBoxTop + paymentHeight + 15
     }
 
+    const subtotalValue = quotation.subtotal || quotation.sub_total || 0
+    const discountValue = quotation.discount || 0
+    const subtotalAfterDiscountValue = subtotalValue - discountValue
+    const gstValue = quotation.gstTotal || quotation.gst_total || 0
+    const hasStoredDiscountPercent = quotation.discountPercent !== undefined && quotation.discountPercent !== null
+    const discountPercentValue = hasStoredDiscountPercent
+      ? Number(quotation.discountPercent)
+      : (subtotalValue > 0 ? (discountValue / subtotalValue) * 100 : 0)
+    const hasStoredGstPercent = quotation.gstPercent !== undefined && quotation.gstPercent !== null
+    const gstPercentValue = Number(hasStoredGstPercent ? quotation.gstPercent : (subtotalAfterDiscountValue > 0 ? (gstValue / subtotalAfterDiscountValue) * 100 : 0))
     const summaryRows = [
-      { label: 'Subtotal', value: formatCurrency(quotation.subtotal || quotation.sub_total || 0) },
-      ...(quotation.gstTotal || quotation.gst_total ? [{ label: 'GST', value: formatCurrency(quotation.gstTotal || quotation.gst_total) }] : []),
-      ...(quotation.discount ? [{ label: 'Discount', value: formatCurrency(quotation.discount) }] : []),
+      { label: 'Discount %', value: `${discountPercentValue.toFixed(2)}%` },
+      { label: 'Discount Amount', value: formatCurrency(discountValue) },
+      { label: 'Subtotal After Discount', value: formatCurrency(subtotalAfterDiscountValue) },
+      { label: 'GST %', value: `${gstPercentValue.toFixed(2)}%` },
+      { label: 'GST Amount', value: formatCurrency(gstValue) },
     ]
 
     const summaryHeight = 70 + summaryRows.length * 28 + 40
