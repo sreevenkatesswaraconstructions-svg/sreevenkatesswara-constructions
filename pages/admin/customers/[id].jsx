@@ -1,0 +1,209 @@
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import AdminLayout from '../../../components/admin/AdminLayout'
+
+const tabs = [
+  ['information', 'Information'],
+  ['timeline', 'Timeline'],
+  ['projects', 'Projects'],
+  ['quotations', 'Quotations'],
+  ['invoices', 'Invoices'],
+  ['payments', 'Payments'],
+  ['documents', 'Documents'],
+  ['notes', 'Notes'],
+]
+
+const emptyStateMessages = {
+  timeline: 'No timeline available.',
+  projects: 'No projects created yet.',
+  quotations: 'No quotations available.',
+  invoices: 'No invoices available.',
+  payments: 'No payments available.',
+  documents: 'No documents uploaded.',
+  notes: 'No notes added.',
+}
+
+const statusStyles = {
+  active: 'bg-emerald-50 text-emerald-700',
+  projectongoing: 'bg-sky-50 text-sky-700',
+  completed: 'bg-violet-50 text-violet-700',
+  inactive: 'bg-rose-50 text-rose-700',
+  default: 'bg-slate-50 text-slate-700',
+}
+
+function formatDate(value) {
+  if (!value) return '-'
+
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(value))
+  } catch {
+    return '-'
+  }
+}
+
+export default function CustomerDetailsPage() {
+  const router = useRouter()
+  const customerId = typeof router.query.id === 'string' ? router.query.id : ''
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('information')
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        setLoading(true)
+        setError('')
+        const response = await fetch('/api/customers')
+        const result = await response.json()
+        if (result?.success) {
+          setCustomers(result.data || [])
+        } else {
+          setError(result?.message || 'Failed to load customers')
+        }
+      } catch (err) {
+        console.error('Failed to load customers', err)
+        setError('Unable to load customers right now.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadCustomers()
+  }, [])
+
+  const customer = useMemo(() => {
+    if (!customerId) return null
+    return customers.find((item) => String(item.id) === String(customerId)) || null
+  }, [customers, customerId])
+
+  const infoItems = useMemo(() => {
+    if (!customer) return []
+
+    const locationParts = String(customer.location || '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+    const address = locationParts[0] || '-'
+    const city = locationParts[1] || '-'
+    const state = locationParts[2] || '-'
+    const pincode = locationParts[3] || '-'
+
+    return [
+      { label: 'Customer ID', value: customer.id || '-' },
+      { label: 'Customer Name', value: customer.name || '-' },
+      { label: 'Phone', value: customer.phone || '-' },
+      { label: 'Email', value: customer.email || '-' },
+      { label: 'Address', value: address },
+      { label: 'City', value: city },
+      { label: 'State', value: state },
+      { label: 'Pincode', value: pincode },
+      { label: 'Lead Source', value: '-' },
+      { label: 'Customer Since', value: formatDate(customer.createdAt) },
+      { label: 'Customer Status', value: customer.status || 'Active' },
+    ]
+  }, [customer])
+
+  const statusKey = String(customer?.status || 'Active').toLowerCase().replace(/\s+/g, '')
+  const statusClass = statusStyles[statusKey] || statusStyles.default
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex h-96 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
+          <p className="font-medium">{error}</p>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (!customer) {
+    return (
+      <AdminLayout>
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <h2 className="text-lg font-semibold text-gray-900">Customer not found</h2>
+          <p className="mt-2 text-sm text-gray-600">The requested customer could not be located.</p>
+          <Link href="/admin/customers" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Customers
+          </Link>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link href="/admin/customers" className="inline-flex items-center gap-2 self-start rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Customers
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{customer.name}</h1>
+              <p className="mt-1 text-sm text-gray-600">Customer profile and overview</p>
+            </div>
+          </div>
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${statusClass}`}>
+            {customer.status || 'Active'}
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex flex-wrap gap-2 border-b border-gray-200 bg-gray-50 p-3 sm:p-4">
+            {tabs.map(([key, label]) => {
+              const isActive = activeTab === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`rounded-full px-3 py-2 text-sm font-medium transition ${
+                    isActive ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="p-4 sm:p-6">
+            {activeTab === 'information' ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {infoItems.map((item) => (
+                  <div key={item.label} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{item.label}</p>
+                    <p className="mt-2 text-sm font-medium text-gray-900">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                <p className="text-lg font-semibold text-gray-900">{emptyStateMessages[activeTab] || 'No data available.'}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  )
+}

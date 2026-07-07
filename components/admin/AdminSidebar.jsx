@@ -11,12 +11,14 @@ import {
   X,
   Moon,
   Sun,
-  Building2
+  Building2,
+  Users
 } from 'lucide-react';
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
   { name: 'Enquiries', icon: MessageSquare, path: '/admin/enquiries' },
+  { name: 'Customers', icon: Users, path: '/admin/customers' },
   { name: 'Quotations', icon: FileText, path: '/admin/quotations' },
   { name: 'Projects', icon: FolderKanban, path: '/admin/projects' },
   { name: 'Blogs', icon: FileText, path: '/admin/blogs' },

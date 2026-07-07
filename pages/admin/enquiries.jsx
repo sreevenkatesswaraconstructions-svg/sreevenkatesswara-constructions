@@ -118,6 +118,31 @@ export default function EnquiriesPage() {
     router.push(`/admin/quotations/create?enquiryId=${encodeURIComponent(enquiry.id)}`);
   };
 
+  const handleConvertToCustomer = async (enquiry) => {
+    if (!enquiry?.id) return;
+
+    try {
+      const response = await fetch(`/api/enquiries/${enquiry.id}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          performedBy: session?.user?.name || session?.user?.email || 'Admin',
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || data?.error || 'Unable to convert enquiry to customer');
+      }
+
+      toast.success('Enquiry converted to customer successfully');
+      fetchEnquiries();
+    } catch (error) {
+      toast.error(error.message || 'Failed to convert enquiry to customer');
+      console.error('Failed to convert enquiry to customer:', error);
+    }
+  };
+
   const handleEditEnquirySubmit = async (formData) => {
     try {
       const response = await fetch(`/api/enquiries/${selectedEnquiry.id}`, {
@@ -383,6 +408,7 @@ export default function EnquiriesPage() {
               <option value="New">New</option>
               <option value="Contacted">Contacted</option>
               <option value="Site Visit Scheduled">Site Visit Scheduled</option>
+              <option value="Quotation Requested">Quotation Requested</option>
               <option value="Quotation Sent">Quotation Sent</option>
               <option value="Follow-up">Follow-up</option>
               <option value="Won">Won</option>
@@ -436,6 +462,23 @@ export default function EnquiriesPage() {
                 <History className="h-4 w-4" />
                 View Timeline
               </button>
+              {normalizeEnquiryStatus(row?.status) === 'Won' && !row?.customerId ? (
+                <button
+                  onClick={() => handleConvertToCustomer(row)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                >
+                  <Check className="h-4 w-4" />
+                  Convert to Customer
+                </button>
+              ) : row?.customerId ? (
+                <button
+                  onClick={() => router.push(`/admin/customers/${row.customerId}`)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                >
+                  <Eye className="h-4 w-4" />
+                  View Customer
+                </button>
+              ) : null}
               <button
                 onClick={() => handleCreateQuotation(row)}
                 className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
@@ -593,6 +636,23 @@ export default function EnquiriesPage() {
                   <History className="w-4 h-4" />
                   View Timeline
                 </button>
+                {normalizeEnquiryStatus(selectedEnquiry?.status) === 'Won' && !selectedEnquiry?.customerId ? (
+                  <button
+                    onClick={() => handleConvertToCustomer(selectedEnquiry)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                  >
+                    <Check className="w-4 h-4" />
+                    Convert to Customer
+                  </button>
+                ) : selectedEnquiry?.customerId ? (
+                  <button
+                    onClick={() => router.push(`/admin/customers/${selectedEnquiry.customerId}`)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View Customer
+                  </button>
+                ) : null}
                 <button
                   onClick={() => handleCreateQuotation(selectedEnquiry)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"

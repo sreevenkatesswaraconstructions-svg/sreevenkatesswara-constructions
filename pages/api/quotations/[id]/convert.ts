@@ -64,6 +64,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await tx.quotation.update({ where: { id }, data: updates })
       }
 
+      if (String(customerRecord.status || '').trim() !== 'Active') {
+        await tx.customer.update({ where: { id: customerRecord.id }, data: { status: 'Active' } })
+      }
+
       await tx.quotationHistory.create({
         data: {
           quotationId: quotation.id,

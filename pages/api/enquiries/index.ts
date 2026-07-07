@@ -23,6 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           variants.push('NEW', 'PENDING')
         } else if (normalizedStatus === 'Follow-up') {
           variants.push('IN_PROGRESS', 'FOLLOW-UP')
+        } else if (normalizedStatus === 'Quotation Requested') {
+          variants.push('QUOTATION_REQUESTED')
         } else if (normalizedStatus === 'Won') {
           variants.push('COMPLETED')
         } else if (normalizedStatus === 'Lost') {
