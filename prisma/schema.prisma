@@ -98,6 +98,7 @@ model Customer {
   enquiryId  String?
   enquiries  Enquiry[]
   quotations Quotation[]
+  projects   Project[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -107,11 +108,19 @@ model Customer {
 
 // Project model for project management
 model Project {
-  id          String @id @default(cuid())
-  title       String
-  description String
-  category    String
-  status      String @default("ONGOING")
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  category         String?
+  status           String    @default("Planning")
+  projectType      String?
+  siteAddress      String?
+  startDate        DateTime?
+  expectedEndDate  DateTime?
+  estimatedBudget  String?
+  projectManager   String?
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   images String?
   videos String?
@@ -125,6 +134,9 @@ model Project {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([status])
 }
 
 // Blog model for CMS-style blog management

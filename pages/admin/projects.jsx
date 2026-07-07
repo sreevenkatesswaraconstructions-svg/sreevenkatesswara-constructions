@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Table from '../../components/admin/Table';
 import Modal from '../../components/admin/Modal';
 import Form from '../../components/admin/Form';
 import MediaPicker from '../../components/admin/MediaPicker';
-import { Plus, Edit, Trash2, Calendar, MapPin, DollarSign, Video } from 'lucide-react';
+import { Edit, Trash2, Calendar, MapPin, DollarSign, Video } from 'lucide-react';
 import { prisma } from '../../lib/prisma';
 
 export default function ProjectsPage({ projects }) {
@@ -259,15 +258,6 @@ export default function ProjectsPage({ projects }) {
               Manage construction and interior projects
             </p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleNewProject}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Add Project
-          </motion.button>
         </div>
 
         {/* Table */}

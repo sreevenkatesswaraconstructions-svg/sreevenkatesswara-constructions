@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 
 const tabs = [
@@ -33,6 +33,14 @@ const statusStyles = {
   default: 'bg-slate-50 text-slate-700',
 }
 
+const projectStatusStyles = {
+  planning: 'bg-slate-100 text-slate-700',
+  ongoing: 'bg-sky-100 text-sky-700',
+  'on hold': 'bg-amber-100 text-amber-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+  default: 'bg-gray-100 text-gray-700',
+}
+
 function formatDate(value) {
   if (!value) return '-'
 
@@ -54,6 +62,9 @@ export default function CustomerDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('information')
+  const [projects, setProjects] = useState([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectsError, setProjectsError] = useState('')
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -77,6 +88,39 @@ export default function CustomerDetailsPage() {
 
     loadCustomers()
   }, [])
+
+  useEffect(() => {
+    if (typeof router.query.tab === 'string' && tabs.some(([key]) => key === router.query.tab)) {
+      setActiveTab(router.query.tab)
+    } else {
+      setActiveTab('information')
+    }
+  }, [router.query.tab])
+
+  useEffect(() => {
+    if (!customerId || activeTab !== 'projects') return
+
+    const loadProjects = async () => {
+      try {
+        setProjectsLoading(true)
+        setProjectsError('')
+        const response = await fetch(`/api/projects?customerId=${customerId}`)
+        const result = await response.json()
+        if (Array.isArray(result)) {
+          setProjects(result)
+        } else {
+          setProjectsError('Unable to load projects right now.')
+        }
+      } catch (err) {
+        console.error('Failed to load customer projects', err)
+        setProjectsError('Unable to load projects right now.')
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+
+    loadProjects()
+  }, [activeTab, customerId])
 
   const customer = useMemo(() => {
     if (!customerId) return null
@@ -113,6 +157,11 @@ export default function CustomerDetailsPage() {
 
   const statusKey = String(customer?.status || 'Active').toLowerCase().replace(/\s+/g, '')
   const statusClass = statusStyles[statusKey] || statusStyles.default
+
+  const getProjectStatusClass = (value) => {
+    const normalized = String(value || 'Planning').toLowerCase().trim()
+    return projectStatusStyles[normalized] || projectStatusStyles.default
+  }
 
   if (loading) {
     return (
@@ -195,6 +244,71 @@ export default function CustomerDetailsPage() {
                     <p className="mt-2 text-sm font-medium text-gray-900">{item.value}</p>
                   </div>
                 ))}
+              </div>
+            ) : activeTab === 'projects' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Projects</h2>
+                    <p className="text-sm text-gray-600">Manage this customer&apos;s construction projects.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/admin/projects/create?customerId=${customerId}`)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create Project
+                  </button>
+                </div>
+
+                {projectsLoading ? (
+                  <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+                      Loading projects...
+                    </div>
+                  </div>
+                ) : projectsError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{projectsError}</div>
+                ) : projects.length === 0 ? (
+                  <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-lg font-semibold text-gray-900">No projects have been created yet.</p>
+                    <p className="mt-2 text-sm text-gray-600">Add the first project for this customer to get started.</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/admin/projects/create?customerId=${customerId}`)}
+                      className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Project
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {projects.map((project) => (
+                      <div key={project.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{project.title || project.projectName || 'Untitled Project'}</h3>
+                            <p className="mt-1 text-sm text-gray-600">{project.projectType || 'Project'}</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getProjectStatusClass(project.status)}`}>
+                            {project.status || 'Planning'}
+                          </span>
+                        </div>
+                        <div className="mt-4 space-y-2 text-sm text-gray-600">
+                          <p><span className="font-medium text-gray-700">Start Date:</span> {formatDate(project.startDate)}</p>
+                        </div>
+                        <div className="mt-5">
+                          <Link href={`/admin/projects/${project.id}`} className="inline-flex items-center text-sm font-semibold text-emerald-600 hover:text-emerald-700">
+                            View Project
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">

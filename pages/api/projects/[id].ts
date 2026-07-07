@@ -31,19 +31,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'PUT') {
     try {
       console.log('[PROJECT API] Updating project:', id);
-      const { title, description, category, status, images, videos, location, completionDate, clientName, featured } = req.body
+      const {
+        title,
+        description,
+        category,
+        projectType,
+        status,
+        images,
+        videos,
+        location,
+        siteAddress,
+        completionDate,
+        clientName,
+        featured,
+        startDate,
+        expectedEndDate,
+        estimatedBudget,
+        projectManager,
+        customerId,
+      } = req.body
 
       const project = await prisma.project.update({
         where: { id },
         data: {
-          ...(title && { title }),
-          ...(description && { description }),
-          ...(category && { category }),
-          ...(status && { status }),
-          ...(images && { images }),
-          ...(videos && { videos }),
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description }),
+          ...(category !== undefined && { category }),
+          ...(projectType !== undefined && { projectType }),
+          ...(status !== undefined && { status }),
+          ...(images !== undefined && { images }),
+          ...(videos !== undefined && { videos }),
           ...(location !== undefined && { location }),
-          ...(completionDate && { completionDate: new Date(completionDate) }),
+          ...(siteAddress !== undefined && { siteAddress }),
+          ...(completionDate !== undefined && { completionDate: completionDate ? new Date(completionDate) : null }),
+          ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+          ...(expectedEndDate !== undefined && { expectedEndDate: expectedEndDate ? new Date(expectedEndDate) : null }),
+          ...(estimatedBudget !== undefined && { estimatedBudget: estimatedBudget ? String(estimatedBudget) : null }),
+          ...(projectManager !== undefined && { projectManager }),
+          ...(customerId !== undefined && { customerId: customerId ? String(customerId) : null }),
           ...(clientName !== undefined && { clientName }),
           ...(featured !== undefined && { featured })
         }

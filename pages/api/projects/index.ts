@@ -5,96 +5,96 @@ import { createNotification } from '../../../lib/notifications'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      console.log('[PROJECT API] Fetching projects with query:', req.query);
-      const { featured, status, category } = req.query
+      console.log('[PROJECT API] Fetching projects with query:', req.query)
+      const { featured, status, category, customerId } = req.query
 
       const where: any = {}
       if (featured === 'true') where.featured = true
       if (status) where.status = status
       if (category) where.category = category
+      if (customerId) where.customerId = String(customerId)
 
       const projects = await prisma.project.findMany({
         where,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       })
 
-      console.log('[PROJECT API] Fetched', projects.length, 'projects');
+      console.log('[PROJECT API] Fetched', projects.length, 'projects')
       return res.status(200).json(projects)
     } catch (error) {
-      console.error('[PROJECT API] Error fetching projects:', error);
+      console.error('[PROJECT API] Error fetching projects:', error)
       return res.status(500).json({ error: 'Failed to fetch projects' })
     }
   }
 
   if (req.method === 'POST') {
     try {
-      console.log('[PROJECT API] Creating project...');
-      const { title, description, category, status, images, videos, location, completionDate, clientName, featured } = req.body
+      console.log('[PROJECT API] Creating project...')
+      const {
+        title,
+        projectName,
+        description,
+        category,
+        projectType,
+        status,
+        images,
+        videos,
+        location,
+        siteAddress,
+        completionDate,
+        clientName,
+        customerName,
+        featured,
+        customerId,
+        startDate,
+        expectedEndDate,
+        estimatedBudget,
+        projectManager,
+      } = req.body
 
-      if (!title || !description || !category) {
-        console.error('[PROJECT API] Missing required fields');
-        return res.status(400).json({ error: 'Missing required fields' })
+      const finalTitle = String(projectName || title || '').trim()
+      const finalProjectType = String(projectType || category || '').trim()
+      const finalSiteAddress = String(siteAddress || location || '').trim()
+
+      if (!finalTitle) {
+        console.error('[PROJECT API] Missing required fields')
+        return res.status(400).json({ error: 'Project name is required' })
       }
-      console.log('[PROJECT API] Request Body:', req.body);
 
-      console.log('[PROJECT API] Data being saved:', {
-      title,
-      description,
-      category,
-      status,
-      images,
-      videos,
-      location,
-     completionDate,
-  clientName,
-  featured
- });
-const project = await prisma.project.create({
-  data: {
-    title,
-    description,
-    category,
-    status: status || 'ONGOING',
+      const project = await prisma.project.create({
+        data: {
+          title: finalTitle,
+          description: description ? String(description) : '',
+          category: finalProjectType || '',
+          status: status ? String(status) : 'Planning',
+          projectType: finalProjectType || '',
+          siteAddress: finalSiteAddress || '',
+          startDate: startDate ? new Date(startDate) : null,
+          expectedEndDate: expectedEndDate ? new Date(expectedEndDate) : null,
+          estimatedBudget: estimatedBudget ? String(estimatedBudget) : '',
+          projectManager: projectManager ? String(projectManager) : '',
+          customerId: customerId ? String(customerId) : null,
+          images: typeof images === 'string' ? images : images?.length ? images.join(',') : '',
+          videos: typeof videos === 'string' ? videos : videos?.length ? videos.join(',') : '',
+          location: finalSiteAddress || '',
+          completionDate: completionDate ? new Date(completionDate) : null,
+          clientName: customerName ? String(customerName) : clientName ? String(clientName) : '',
+          featured: Boolean(featured),
+        },
+      })
 
-    images:
-      typeof images === 'string'
-        ? images
-        : images?.length
-        ? images.join(',')
-        : 'https://via.placeholder.com/600x400',
+      console.log('[PROJECT API] Project created:', project.id)
 
-    videos:
-      typeof videos === 'string'
-        ? videos
-        : videos?.length
-        ? videos.join(',')
-        : '',
-
-    location: location || 'Visakhapatnam',
-
-    completionDate: completionDate
-      ? new Date(completionDate)
-      : null,
-
-    clientName: clientName || '',
-
-    featured: featured || false,
-  },
-});
-
-      console.log('[PROJECT API] Project created:', project.id);
-
-      // Create notification
       await createNotification({
         title: 'New Project Added',
-        message: `Project "${title}" has been added`,
+        message: `Project "${finalTitle}" has been added`,
         type: 'success',
-        link: '/admin/projects'
+        link: '/admin/projects',
       })
 
       return res.status(201).json(project)
     } catch (error) {
-      console.error('[PROJECT API] Error creating project:', error);
+      console.error('[PROJECT API] Error creating project:', error)
       return res.status(500).json({ error: 'Failed to create project' })
     }
   }
