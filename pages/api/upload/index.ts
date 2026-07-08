@@ -72,9 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fileName = `${timestamp}-${randomString}${extension}`
 
     // Create upload directory if it doesn't exist
-    const targetDir = path.join(process.cwd(), 'public', 'uploads', uploadDir)
-    await fs.mkdir(targetDir, { recursive: true })
-    //const filePath = path.join(targetDir, fileName)
+  
     //await fs.copyFile(file.filepath, filePath)
 
     //const exists = await fs.stat(filePath)
@@ -86,14 +84,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     //const fileUrl = `/uploads/${uploadDir}/${fileName}`
     // ===== CLOUDINARY UPLOAD =====
     // Determine resource type based on file type
-    let resourceType: string = "auto"
-    if (fileType === "document") {
-      resourceType = "raw"
-    } else if (fileType === "image") {
-      resourceType = "image"
-    } else if (fileType === "video") {
-      resourceType = "video"
-    }
+    const resourceType =
+    fileType === "image"
+    ? "image"
+    : fileType === "video"
+    ? "video"
+    : "raw"
 
     const uploadResult = await cloudinary.uploader.upload(file.filepath, {
         folder: "sreevenkatesswara",
