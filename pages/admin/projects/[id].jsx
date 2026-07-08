@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import { Toaster, toast } from 'react-hot-toast'
 import { ArrowLeft, Loader2, RefreshCw, Users, MapPin, Box, Wrench, CreditCard, Flag, Info, Edit2, Trash2, Plus, FileText, FileImage, FileVideo, Eye, Play, Download, X, UploadCloud } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import { prisma } from '../../../lib/prisma'
@@ -22,6 +23,21 @@ const statusStyles = {
   completed: 'bg-emerald-100 text-emerald-700',
   default: 'bg-gray-100 text-gray-700',
 }
+
+const labourRoleOptions = [
+  'Mason',
+  'Helper',
+  'Carpenter',
+  'Electrician',
+  'Plumber',
+  'Painter',
+  'Welder',
+  'Tile Worker',
+  'Supervisor',
+  'Other',
+]
+
+const labourStatusOptions = ['ACTIVE', 'INACTIVE']
 
 function formatDate(value) {
   if (!value) return '-'
@@ -115,6 +131,21 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [paymentsNotice, setPaymentsNotice] = useState('')
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [labours, setLabours] = useState([])
+  const [laboursLoading, setLaboursLoading] = useState(false)
+  const [laboursNotice, setLaboursNotice] = useState('')
+  const [labourModalOpen, setLabourModalOpen] = useState(false)
+  const [editingLabourId, setEditingLabourId] = useState(null)
+  const [savingLabour, setSavingLabour] = useState(false)
+  const [labourForm, setLabourForm] = useState({
+    name: '',
+    phone: '',
+    role: 'Mason',
+    dailyWage: '',
+    joiningDate: '',
+    status: 'ACTIVE',
+    notes: '',
+  })
   const [editingPaymentId, setEditingPaymentId] = useState(null)
   const [savingPayment, setSavingPayment] = useState(false)
   const [paymentForm, setPaymentForm] = useState({
@@ -233,6 +264,29 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
       setPaymentsNotice('Unable to load project payments right now.')
     } finally {
       setPaymentsLoading(false)
+    }
+  }
+
+  const fetchLabours = async () => {
+    if (!projectId) return
+    try {
+      setLaboursLoading(true)
+      setLaboursNotice('')
+      const resp = await fetch(`/api/labour?projectId=${encodeURIComponent(projectId)}`)
+      if (resp.ok) {
+        const result = await resp.json()
+        setLabours(Array.isArray(result?.data) ? result.data : [])
+      } else {
+        setLabours([])
+        const result = await resp.json().catch(() => ({}))
+        setLaboursNotice(result?.message || 'Unable to load project labour.')
+      }
+    } catch (err) {
+      console.error('Failed to load project labour', err)
+      setLabours([])
+      setLaboursNotice('Unable to load project labour right now.')
+    } finally {
+      setLaboursLoading(false)
     }
   }
 
@@ -356,6 +410,10 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
 
     if (activeTab === 'payments') {
       fetchPayments()
+    }
+
+    if (activeTab === 'labour') {
+      fetchLabours()
     }
   }, [activeTab, projectId])
 
@@ -488,6 +546,104 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
       setPaymentsNotice(err?.message || 'Unable to delete payment right now.')
     }
   }
+
+  const openLabourModal = (labour = null) => {
+    if (labour) {
+      setEditingLabourId(labour.id)
+      setLabourForm({
+        name: labour.name || '',
+        phone: labour.phone || '',
+        role: labour.role || 'Mason',
+        dailyWage: labour.dailyWage != null ? String(labour.dailyWage) : '',
+        joiningDate: labour.joiningDate ? new Date(labour.joiningDate).toISOString().split('T')[0] : '',
+        status: labour.status || 'ACTIVE',
+        notes: labour.notes || '',
+      })
+    } else {
+      setEditingLabourId(null)
+      setLabourForm({
+        name: '',
+        phone: '',
+        role: 'Mason',
+        dailyWage: '',
+        joiningDate: '',
+        status: 'ACTIVE',
+        notes: '',
+      })
+    }
+    setLabourModalOpen(true)
+  }
+
+  const handleSaveLabour = async (event) => {
+    event.preventDefault()
+
+    if (!labourForm.name || !labourForm.phone || !labourForm.dailyWage) {
+      setLaboursNotice('Please enter the labour name, phone, and daily wage.')
+      return
+    }
+
+    try {
+      setSavingLabour(true)
+      setLaboursNotice('')
+      const payload = {
+        name: labourForm.name,
+        phone: labourForm.phone,
+        role: labourForm.role,
+        dailyWage: Number(labourForm.dailyWage),
+        joiningDate: labourForm.joiningDate || null,
+        status: labourForm.status,
+        notes: labourForm.notes,
+        projectId,
+      }
+
+      const resp = editingLabourId
+        ? await fetch(`/api/labour/${editingLabourId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch('/api/labour', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+
+      const result = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        throw new Error(result?.message || 'Unable to save labour entry.')
+      }
+
+      setLabourModalOpen(false)
+      setEditingLabourId(null)
+      setLabourForm({ name: '', phone: '', role: 'Mason', dailyWage: '', joiningDate: '', status: 'ACTIVE', notes: '' })
+      fetchLabours()
+      toast.success(editingLabourId ? 'Labour updated successfully.' : 'Labour added successfully.')
+    } catch (err) {
+      console.error('Failed to save labour', err)
+      setLaboursNotice(err?.message || 'Unable to save labour right now.')
+      toast.error(err?.message || 'Unable to save labour right now.')
+    } finally {
+      setSavingLabour(false)
+    }
+  }
+
+  const handleDeleteLabour = async (labourId) => {
+    if (!confirm('Delete this labour entry?')) return
+    try {
+      const resp = await fetch(`/api/labour/${labourId}`, { method: 'DELETE' })
+      if (!resp.ok) {
+        const result = await resp.json().catch(() => ({}))
+        throw new Error(result?.message || 'Unable to delete labour entry.')
+      }
+      fetchLabours()
+      toast.success('Labour deleted successfully.')
+    } catch (err) {
+      console.error('Failed to delete labour', err)
+      setLaboursNotice(err?.message || 'Unable to delete labour right now.')
+      toast.error(err?.message || 'Unable to delete labour right now.')
+    }
+  }
+
   const projectManager = project?.projectManager || '-'
   const customerName = customer?.name || project?.clientName || project?.customerName || '-'
   const customerPhone = customer?.phone || project?.customerPhone || '-'
@@ -1219,6 +1375,243 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
                   </div>
                 ) : null}
               </div>
+            ) : activeTab === 'labour' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Project Labour</h2>
+                    <p className="text-sm text-gray-600">Track labour assigned to this project.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchLabours()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openLabourModal()}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Labour
+                    </button>
+                  </div>
+                </div>
+
+                {laboursNotice ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    {laboursNotice}
+                  </div>
+                ) : null}
+
+                {laboursLoading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                ) : labours.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-sm font-medium text-gray-900">No labour records added yet.</p>
+                    <p className="mt-2 text-sm text-gray-600">Add the first labour entry for this project.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Phone</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Daily Wage</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Joining Date</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {labours.map((labour) => (
+                          <tr key={labour.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-gray-900">{labour.name}</div>
+                              {labour.notes ? <div className="mt-1 text-xs text-gray-500">{labour.notes}</div> : null}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{labour.phone}</td>
+                            <td className="px-4 py-3 text-gray-700">{labour.role}</td>
+                            <td className="px-4 py-3 text-gray-700">₹{Number(labour.dailyWage || 0).toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 text-gray-700">
+                              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${labour.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                                {labour.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{labour.joiningDate ? formatDate(labour.joiningDate) : '-'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openLabourModal(labour)}
+                                  className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteLabour(labour.id)}
+                                  className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {labourModalOpen ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{editingLabourId ? 'Edit Labour' : 'Add Labour'}</h3>
+                          <p className="mt-1 text-sm text-gray-600">Create or update labour assigned to this project.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLabourModalOpen(false)
+                            setEditingLabourId(null)
+                            setLabourForm({ name: '', phone: '', role: 'Mason', dailyWage: '', joiningDate: '', status: 'ACTIVE', notes: '' })
+                          }}
+                          className="rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSaveLabour} className="mt-5 space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Name</label>
+                            <input
+                              type="text"
+                              value={labourForm.name}
+                              onChange={(event) => setLabourForm((prev) => ({ ...prev, name: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Phone</label>
+                            <input
+                              type="text"
+                              value={labourForm.phone}
+                              onChange={(event) => setLabourForm((prev) => ({ ...prev, phone: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Role</label>
+                            <select
+                              value={labourForm.role}
+                              onChange={(event) => setLabourForm((prev) => ({ ...prev, role: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                            >
+                              {labourRoleOptions.map((role) => (
+                                <option key={role} value={role}>{role}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Daily Wage</label>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={labourForm.dailyWage}
+                              onChange={(event) => setLabourForm((prev) => ({ ...prev, dailyWage: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Joining Date</label>
+                            <input
+                              type="date"
+                              value={labourForm.joiningDate}
+                              onChange={(event) => setLabourForm((prev) => ({ ...prev, joiningDate: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Status</label>
+                            <select
+                              value={labourForm.status}
+                              onChange={(event) => setLabourForm((prev) => ({ ...prev, status: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                            >
+                              {labourStatusOptions.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Notes</label>
+                          <textarea
+                            value={labourForm.notes}
+                            onChange={(event) => setLabourForm((prev) => ({ ...prev, notes: event.target.value }))}
+                            className="min-h-[100px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                            placeholder="Optional notes"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLabourModalOpen(false)
+                              setEditingLabourId(null)
+                              setLabourForm({ name: '', phone: '', role: 'Mason', dailyWage: '', joiningDate: '', status: 'ACTIVE', notes: '' })
+                            }}
+                            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingLabour}
+                            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                          >
+                            {savingLabour ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              editingLabourId ? 'Update Labour' : 'Save Labour'
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
                 <p className="text-lg font-semibold text-gray-900">This module will be implemented in the next sprint.</p>
@@ -1227,6 +1620,7 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
           </div>
         </div>
       </div>
+      <Toaster position="top-right" />
     </AdminLayout>
   )
 }

@@ -118,6 +118,26 @@ model Customer {
   @@index([enquiryId])
 }
 
+model Labour {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  role        String
+  dailyWage   Float
+  status      String   @default("ACTIVE")
+  joiningDate DateTime @default(now())
+  notes       String?
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([role])
+  @@index([phone])
+  @@index([projectId])
+}
+
 // Project model for project management
 model Project {
   id               String    @id @default(cuid())
@@ -150,6 +170,7 @@ model Project {
   timelines ProjectTimeline[]
   documents ProjectDocument[]
   payments  ProjectPayment[]
+  labours   Labour[]
 
   @@index([customerId])
   @@index([status])
