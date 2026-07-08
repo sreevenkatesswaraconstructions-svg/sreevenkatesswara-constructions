@@ -138,6 +138,25 @@ model Labour {
   @@index([projectId])
 }
 
+model Material {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  materialName String
+  category     String?
+  quantity     Float
+  unit         String?
+  unitPrice    Float    @default(0)
+  totalPrice   Float    @default(0)
+  supplier     String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([materialName])
+}
+
 // Project model for project management
 model Project {
   id               String    @id @default(cuid())
@@ -171,6 +190,7 @@ model Project {
   documents ProjectDocument[]
   payments  ProjectPayment[]
   labours   Labour[]
+  materials Material[]
 
   @@index([customerId])
   @@index([status])
