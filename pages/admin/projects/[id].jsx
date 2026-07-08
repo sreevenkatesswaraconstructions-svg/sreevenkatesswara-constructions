@@ -111,6 +111,20 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
   const [documents, setDocuments] = useState([])
   const [documentsLoading, setDocumentsLoading] = useState(false)
   const [documentsNotice, setDocumentsNotice] = useState('')
+  const [payments, setPayments] = useState([])
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [paymentsNotice, setPaymentsNotice] = useState('')
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [editingPaymentId, setEditingPaymentId] = useState(null)
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [paymentForm, setPaymentForm] = useState({
+    paymentDate: '',
+    amount: '',
+    paymentMode: 'Cash',
+    paymentType: 'Other',
+    referenceNumber: '',
+    notes: '',
+  })
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [selectedDocumentFile, setSelectedDocumentFile] = useState(null)
   const [selectedDocumentCategory, setSelectedDocumentCategory] = useState('Other')
@@ -196,6 +210,29 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
       setDocumentsNotice('Unable to load project documents right now.')
     } finally {
       setDocumentsLoading(false)
+    }
+  }
+
+  const fetchPayments = async () => {
+    if (!projectId) return
+    try {
+      setPaymentsLoading(true)
+      setPaymentsNotice('')
+      const resp = await fetch(`/api/projects/${projectId}/payments`)
+      if (resp.ok) {
+        const data = await resp.json()
+        setPayments(Array.isArray(data) ? data : [])
+      } else {
+        setPayments([])
+        const result = await resp.json().catch(() => ({}))
+        setPaymentsNotice(result?.error || 'Unable to load project payments.')
+      }
+    } catch (err) {
+      console.error('Failed to load project payments', err)
+      setPayments([])
+      setPaymentsNotice('Unable to load project payments right now.')
+    } finally {
+      setPaymentsLoading(false)
     }
   }
 
@@ -316,7 +353,31 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
     if (activeTab === 'documents') {
       fetchDocuments()
     }
+
+    if (activeTab === 'payments') {
+      fetchPayments()
+    }
   }, [activeTab, projectId])
+
+  const parseCurrencyValue = (value) => {
+    if (value === null || value === undefined || value === '') return 0
+    const numeric = Number(String(value).replace(/[^\d.-]/g, ''))
+    return Number.isFinite(numeric) ? numeric : 0
+  }
+
+  const formatCurrency = (value) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return '-'
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(numeric)
+  }
+
+  const totalProjectValue = useMemo(() => parseCurrencyValue(project?.estimatedBudget), [project?.estimatedBudget])
+  const amountReceived = useMemo(() => payments.reduce((total, payment) => total + Number(payment?.amount || 0), 0), [payments])
+  const outstandingBalance = useMemo(() => totalProjectValue - amountReceived, [amountReceived, totalProjectValue])
 
   const infoItems = useMemo(() => {
     if (!project) return []
@@ -338,6 +399,95 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
 
   const projectName = project?.title || project?.projectName || 'Project Details'
   const projectType = project?.projectType || '-'
+
+  const openPaymentModal = (payment = null) => {
+    if (payment) {
+      setEditingPaymentId(payment.id)
+      setPaymentForm({
+        paymentDate: payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : '',
+        amount: payment.amount != null ? String(payment.amount) : '',
+        paymentMode: payment.paymentMode || 'Cash',
+        paymentType: payment.paymentType || 'Other',
+        referenceNumber: payment.referenceNumber || '',
+        notes: payment.notes || '',
+      })
+    } else {
+      setEditingPaymentId(null)
+      setPaymentForm({
+        paymentDate: '',
+        amount: '',
+        paymentMode: 'Cash',
+        paymentType: 'Other',
+        referenceNumber: '',
+        notes: '',
+      })
+    }
+    setPaymentModalOpen(true)
+  }
+
+  const handleSavePayment = async (event) => {
+    event.preventDefault()
+
+    if (!paymentForm.paymentDate || !paymentForm.amount || !paymentForm.paymentMode) {
+      setPaymentsNotice('Please fill the payment date, amount, and payment mode.')
+      return
+    }
+
+    try {
+      setSavingPayment(true)
+      setPaymentsNotice('')
+      const payload = {
+        paymentDate: paymentForm.paymentDate,
+        amount: paymentForm.amount,
+        paymentMode: paymentForm.paymentMode,
+        paymentType: paymentForm.paymentType,
+        referenceNumber: paymentForm.referenceNumber,
+        notes: paymentForm.notes,
+      }
+
+      const resp = editingPaymentId
+        ? await fetch(`/api/projects/${projectId}/payments/${editingPaymentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch(`/api/projects/${projectId}/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+
+      const result = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        throw new Error(result?.error || 'Unable to save payment.')
+      }
+
+      setPaymentModalOpen(false)
+      setEditingPaymentId(null)
+      setPaymentForm({ paymentDate: '', amount: '', paymentMode: 'Cash', paymentType: 'Other', referenceNumber: '', notes: '' })
+      fetchPayments()
+    } catch (err) {
+      console.error('Failed to save payment', err)
+      setPaymentsNotice(err?.message || 'Unable to save payment right now.')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!confirm('Delete this payment entry?')) return
+    try {
+      const resp = await fetch(`/api/projects/${projectId}/payments/${paymentId}`, { method: 'DELETE' })
+      if (!resp.ok) {
+        const result = await resp.json().catch(() => ({}))
+        throw new Error(result?.error || 'Unable to delete payment.')
+      }
+      fetchPayments()
+    } catch (err) {
+      console.error('Failed to delete payment', err)
+      setPaymentsNotice(err?.message || 'Unable to delete payment right now.')
+    }
+  }
   const projectManager = project?.projectManager || '-'
   const customerName = customer?.name || project?.clientName || project?.customerName || '-'
   const customerPhone = customer?.phone || project?.customerPhone || '-'
@@ -816,6 +966,251 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
                                 <UploadCloud className="h-4 w-4" />
                                 Upload
                               </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : activeTab === 'payments' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Project Payments</h2>
+                    <p className="text-sm text-gray-600">Track project value, received payments, and the outstanding balance.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchPayments()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openPaymentModal()}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Payment
+                    </button>
+                  </div>
+                </div>
+
+                {paymentsNotice ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    {paymentsNotice}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Project Value</p>
+                    <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalProjectValue)}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Amount Received</p>
+                    <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(amountReceived)}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Outstanding Balance</p>
+                    <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(outstandingBalance)}</p>
+                  </div>
+                </div>
+
+                {paymentsLoading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                ) : payments.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-sm font-medium text-gray-900">No payments added yet.</p>
+                    <p className="mt-2 text-sm text-gray-600">Add the first payment to start tracking project collections.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Amount</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Type</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Mode</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Reference</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Notes</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {payments.map((payment) => (
+                          <tr key={payment.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-gray-700">{formatDate(payment.paymentDate)}</td>
+                            <td className="px-4 py-3 font-semibold text-gray-900">{formatCurrency(payment.amount)}</td>
+                            <td className="px-4 py-3 text-gray-700">
+                              <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                                {payment.paymentType === 'FirstInstallment' ? '1st Installment' : payment.paymentType === 'SecondInstallment' ? '2nd Installment' : payment.paymentType === 'ThirdInstallment' ? '3rd Installment' : payment.paymentType === 'FinalPayment' ? 'Final Payment' : payment.paymentType === 'ExtraWork' ? 'Extra Work' : payment.paymentType || 'Other'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{payment.paymentMode || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{payment.referenceNumber || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{payment.notes || '-'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openPaymentModal(payment)}
+                                  className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePayment(payment.id)}
+                                  className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {paymentModalOpen ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{editingPaymentId ? 'Edit Payment' : 'Add Payment'}</h3>
+                          <p className="mt-1 text-sm text-gray-600">Record a customer payment against this project.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentModalOpen(false)
+                            setEditingPaymentId(null)
+                            setPaymentForm({ paymentDate: '', amount: '', paymentMode: 'Cash', referenceNumber: '', notes: '' })
+                          }}
+                          className="rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSavePayment} className="mt-5 space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Payment Date</label>
+                            <input
+                              type="date"
+                              value={paymentForm.paymentDate}
+                              onChange={(event) => setPaymentForm((prev) => ({ ...prev, paymentDate: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Amount</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={paymentForm.amount}
+                              onChange={(event) => setPaymentForm((prev) => ({ ...prev, amount: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Payment Mode</label>
+                          <select
+                            value={paymentForm.paymentMode}
+                            onChange={(event) => setPaymentForm((prev) => ({ ...prev, paymentMode: event.target.value }))}
+                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                            required
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cheque">Cheque</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Payment Type</label>
+                          <select
+                            value={paymentForm.paymentType}
+                            onChange={(event) => setPaymentForm((prev) => ({ ...prev, paymentType: event.target.value }))}
+                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                            required
+                          >
+                            <option value="Advance">Advance</option>
+                            <option value="FirstInstallment">First Installment</option>
+                            <option value="SecondInstallment">Second Installment</option>
+                            <option value="ThirdInstallment">Third Installment</option>
+                            <option value="FinalPayment">Final Payment</option>
+                            <option value="ExtraWork">Extra Work</option>
+                            <option value="Refund">Refund</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Reference Number</label>
+                          <input
+                            type="text"
+                            value={paymentForm.referenceNumber}
+                            onChange={(event) => setPaymentForm((prev) => ({ ...prev, referenceNumber: event.target.value }))}
+                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                            placeholder="Optional"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Notes</label>
+                          <textarea
+                            value={paymentForm.notes}
+                            onChange={(event) => setPaymentForm((prev) => ({ ...prev, notes: event.target.value }))}
+                            className="min-h-[100px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                            placeholder="Optional"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentModalOpen(false)
+                              setEditingPaymentId(null)
+                              setPaymentForm({ paymentDate: '', amount: '', paymentMode: 'Cash', referenceNumber: '', notes: '' })
+                            }}
+                            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingPayment}
+                            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                          >
+                            {savingPayment ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              editingPaymentId ? 'Update Payment' : 'Save Payment'
                             )}
                           </button>
                         </div>

@@ -9,6 +9,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Enum for payment types
+enum PaymentType {
+  Advance
+  FirstInstallment
+  SecondInstallment
+  ThirdInstallment
+  FinalPayment
+  ExtraWork
+  Refund
+  Other
+}
+
 // User model for authentication and role-based access
 model User {
   id            String    @id @default(cuid())
@@ -137,9 +149,27 @@ model Project {
 
   timelines ProjectTimeline[]
   documents ProjectDocument[]
+  payments  ProjectPayment[]
 
   @@index([customerId])
   @@index([status])
+}
+
+model ProjectPayment {
+  id              String      @id @default(cuid())
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId       String
+  paymentDate     DateTime
+  amount          Float
+  paymentMode     String
+  paymentType     PaymentType @default(Other)
+  referenceNumber String?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([projectId])
+  @@index([paymentDate])
 }
 
 model ProjectDocument {
