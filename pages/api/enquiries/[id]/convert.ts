@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]'
 import { prisma } from '../../../../lib/prisma'
 import { addEnquiryActivity } from '../../../../lib/enquiryTimeline'
+import { addCustomerTimelineEvent } from '../../../../lib/customerTimeline'
 
 const response = (success: boolean, data: any = null, message: string = '') => ({ success, data, message })
 
@@ -29,6 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const customer = await prisma.$transaction(async (tx) => {
       let customerRecord = await tx.customer.findUnique({ where: { phone } })
+      let customerWasCreated = false
 
       if (!customerRecord) {
         customerRecord = await tx.customer.findFirst({ where: { phone: { contains: phone } } })
@@ -45,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             enquiryId: enquiry.id,
           },
         })
+        customerWasCreated = true
       }
 
       const updates: any = {}
@@ -79,10 +82,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       })
 
-      return customerRecord
+      return { customerRecord, customerWasCreated }
     })
 
-    return res.status(200).json(response(true, customer, 'Enquiry converted to customer'))
+    if (customer.customerWasCreated) {
+      try {
+        await addCustomerTimelineEvent({
+          customerId: customer.customerRecord.id,
+          eventType: 'CUSTOMER_CREATED',
+          title: 'Customer Created',
+          description: 'Customer profile was created.',
+          source: 'SYSTEM',
+          createdBy: 'System',
+        })
+      } catch (error) {
+        console.error('Failed to create customer timeline event:', error)
+      }
+    }
+
+    return res.status(200).json(response(true, customer.customerRecord, 'Enquiry converted to customer'))
   } catch (error: any) {
     console.error('POST /api/enquiries/:id/convert', error)
     return res.status(500).json(response(false, null, 'Failed to convert enquiry to customer'))

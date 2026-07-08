@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { ArrowLeft, Loader2, Plus } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, RefreshCw, Info, MapPin, Box, Wrench, CreditCard, Flag, Users } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 
 const tabs = [
@@ -16,7 +16,7 @@ const tabs = [
 ]
 
 const emptyStateMessages = {
-  timeline: 'No timeline available.',
+  timeline: 'No timeline events available.',
   projects: 'No projects created yet.',
   quotations: 'No quotations available.',
   invoices: 'No invoices available.',
@@ -65,6 +65,9 @@ export default function CustomerDetailsPage() {
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectsError, setProjectsError] = useState('')
+  const [timeline, setTimeline] = useState([])
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineError, setTimelineError] = useState('')
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -120,6 +123,31 @@ export default function CustomerDetailsPage() {
     }
 
     loadProjects()
+  }, [activeTab, customerId])
+
+  useEffect(() => {
+    if (!customerId || activeTab !== 'timeline') return
+
+    const loadTimeline = async () => {
+      try {
+        setTimelineLoading(true)
+        setTimelineError('')
+        const response = await fetch(`/api/customers/${customerId}/timeline`)
+        const result = await response.json()
+        if (result?.success) {
+          setTimeline(result.data || [])
+        } else {
+          setTimelineError(result?.message || 'Unable to load timeline right now.')
+        }
+      } catch (err) {
+        console.error('Failed to load customer timeline', err)
+        setTimelineError('Unable to load timeline right now.')
+      } finally {
+        setTimelineLoading(false)
+      }
+    }
+
+    loadTimeline()
   }, [activeTab, customerId])
 
   const customer = useMemo(() => {
@@ -308,6 +336,88 @@ export default function CustomerDetailsPage() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            ) : activeTab === 'timeline' ? (
+              <div className="space-y-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Customer Timeline</h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimeline([])
+                      setTimelineLoading(true)
+                      fetch(`/api/customers/${customerId}/timeline`)
+                        .then(r => r.json())
+                        .then(d => {
+                          if (d.success) {
+                            setTimeline(d.data || [])
+                          }
+                          setTimelineLoading(false)
+                        })
+                        .catch(() => setTimelineLoading(false))
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh
+                  </button>
+                </div>
+
+                {timelineLoading ? (
+                  <div className="flex items-center justify-center p-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                ) : timelineError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{timelineError}</div>
+                ) : timeline.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-sm text-gray-600">No timeline events yet.</p>
+                  </div>
+                ) : (
+                  timeline.map((event) => {
+                    const eventType = event.eventType || 'Other'
+                    const icon = {
+                      'Status Update': <RefreshCw className="h-5 w-5 text-slate-600" />,
+                      'Meeting': <Users className="h-5 w-5 text-slate-600" />,
+                      'Site Visit': <MapPin className="h-5 w-5 text-slate-600" />,
+                      'Material Order': <Box className="h-5 w-5 text-slate-600" />,
+                      'Labour Assigned': <Wrench className="h-5 w-5 text-slate-600" />,
+                      'Payment': <CreditCard className="h-5 w-5 text-slate-600" />,
+                      'Milestone': <Flag className="h-5 w-5 text-slate-600" />,
+                      'Other': <Info className="h-5 w-5 text-slate-600" />,
+                    }[eventType] || <Info className="h-5 w-5 text-slate-600" />
+
+                    const sourceStyles = {
+                      'SYSTEM': 'bg-blue-50 text-blue-700',
+                      'MANUAL': 'bg-amber-50 text-amber-700',
+                    }
+                    const sourceBadgeClass = sourceStyles[event.source] || 'bg-gray-50 text-gray-700'
+
+                    return (
+                      <div key={event.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-lg bg-gray-50 p-2">{icon}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-semibold text-gray-900">{event.title}</h3>
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${sourceBadgeClass}`}>
+                                  {event.source || 'SYSTEM'}
+                                </span>
+                              </div>
+                              {event.description && (
+                                <p className="mt-1 text-sm text-gray-600">{event.description}</p>
+                              )}
+                              <p className="mt-2 text-xs text-gray-500">
+                                {new Date(event.createdAt).toLocaleString()} {event.createdBy ? `• ${event.createdBy}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </div>
             ) : (

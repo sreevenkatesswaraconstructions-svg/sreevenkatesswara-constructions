@@ -111,11 +111,29 @@ model Customer {
   enquiries  Enquiry[]
   quotations Quotation[]
   projects   Project[]
+  timeline   CustomerTimeline[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   @@index([phone])
   @@index([enquiryId])
+}
+
+model CustomerTimeline {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  eventType   String
+  title       String
+  description String?
+  source      String   @default("SYSTEM")
+  createdBy   String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
 }
 
 model Labour {

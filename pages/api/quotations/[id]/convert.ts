@@ -4,6 +4,7 @@ import { authOptions } from '../../auth/[...nextauth]'
 import { prisma } from '../../../../lib/prisma'
 import { normalizeQuotationRecord } from '../../../../lib/quotations'
 import { addEnquiryActivity } from '../../../../lib/enquiryTimeline'
+import { addCustomerTimelineEvent } from '../../../../lib/customerTimeline'
 
 const response = (success: boolean, data: any = null, message: string = '') => ({ success, data, message })
 
@@ -39,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const customer = await prisma.$transaction(async (tx) => {
       // Try exact match first (normalized phone)
       let customerRecord = await tx.customer.findUnique({ where: { phone } })
+      let customerWasCreated = false
 
       // Fallback: try to find a customer whose phone contains the digits (handles formatting differences)
       if (!customerRecord) {
@@ -54,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             location: quotation.siteAddress || undefined,
           }
         })
+        customerWasCreated = true
       }
 
       const updates: any = {}
@@ -91,8 +94,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
       }
 
-      return customerRecord
+      return { customerRecord, customerWasCreated }
     })
+
+    if (customer.customerWasCreated) {
+      try {
+        await addCustomerTimelineEvent({
+          customerId: customer.customerRecord.id,
+          eventType: 'CUSTOMER_CREATED',
+          title: 'Customer Created',
+          description: 'Customer profile was created.',
+          source: 'SYSTEM',
+          createdBy: 'System',
+        })
+      } catch (error) {
+        console.error('Failed to create customer timeline event:', error)
+      }
+    }
 
     const updatedQuotation = await prisma.quotation.findUnique({ where: { id }, include: { customer: true } })
     return res.status(200).json(response(true, normalizeQuotationRecord(updatedQuotation), 'Customer conversion completed'))
