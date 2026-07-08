@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, RefreshCw, Users, MapPin, Box, Wrench, CreditCard, Flag, Info, Edit2, Trash2, Plus } from 'lucide-react'
+import { ArrowLeft, Loader2, RefreshCw, Users, MapPin, Box, Wrench, CreditCard, Flag, Info, Edit2, Trash2, Plus, FileText, FileImage, FileVideo, Eye, Play, Download, X, UploadCloud } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import { prisma } from '../../../lib/prisma'
 
@@ -35,6 +35,35 @@ function formatDate(value) {
   } catch {
     return '-'
   }
+}
+
+function formatFileSize(value) {
+  if (!Number.isFinite(Number(value)) || Number(value) <= 0) {
+    return '-'
+  }
+
+  const bytes = Number(value)
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  let size = bytes
+  let index = 0
+
+  while (size >= 1024 && index < sizes.length - 1) {
+    size /= 1024
+    index += 1
+  }
+
+  return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${sizes[index]}`
+}
+
+function getDocumentKind(doc) {
+  const fileType = String(doc?.fileType || '').toLowerCase()
+  const fileName = String(doc?.originalName || doc?.fileName || '').toLowerCase()
+
+  if (fileType.includes('pdf') || fileName.endsWith('.pdf')) return 'pdf'
+  if (fileType.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp'].some((ext) => fileName.endsWith(ext))) return 'image'
+  if (fileType.startsWith('video/') || ['.mp4', '.mov', '.webm', '.avi', '.mkv'].some((ext) => fileName.endsWith(ext))) return 'video'
+
+  return 'document'
 }
 
 export async function getServerSideProps({ params }) {
@@ -79,6 +108,14 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
   const [editNotice, setEditNotice] = useState('')
   const [timeline, setTimeline] = useState([])
   const [timelineLoading, setTimelineLoading] = useState(false)
+  const [documents, setDocuments] = useState([])
+  const [documentsLoading, setDocumentsLoading] = useState(false)
+  const [documentsNotice, setDocumentsNotice] = useState('')
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [selectedDocumentFile, setSelectedDocumentFile] = useState(null)
+  const [selectedDocumentCategory, setSelectedDocumentCategory] = useState('Other')
+  const [uploadingDocument, setUploadingDocument] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formType, setFormType] = useState('Update')
   const [formTitle, setFormTitle] = useState('')
@@ -139,9 +176,145 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
     }
   }
 
+  const fetchDocuments = async () => {
+    if (!projectId) return
+    try {
+      setDocumentsLoading(true)
+      setDocumentsNotice('')
+      const resp = await fetch(`/api/projects/${projectId}/documents`)
+      if (resp.ok) {
+        const data = await resp.json()
+        setDocuments(Array.isArray(data) ? data : [])
+      } else {
+        setDocuments([])
+        const result = await resp.json().catch(() => ({}))
+        setDocumentsNotice(result?.error || 'Unable to load project documents.')
+      }
+    } catch (err) {
+      console.error('Failed to load documents', err)
+      setDocuments([])
+      setDocumentsNotice('Unable to load project documents right now.')
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }
+
+  const handleUploadDocument = async (event) => {
+    event.preventDefault()
+
+    if (!selectedDocumentFile) {
+      setDocumentsNotice('Please choose a file to upload.')
+      return
+    }
+
+    try {
+      setUploadingDocument(true)
+      setDocumentsNotice('')
+
+      const formData = new FormData()
+      formData.append('file', selectedDocumentFile)
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const uploadResult = await uploadResponse.json()
+      if (!uploadResponse.ok || !uploadResult?.success) {
+        throw new Error(uploadResult?.error || 'Upload failed')
+      }
+
+      const createDocumentResponse = await fetch(`/api/projects/${projectId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: uploadResult?.media?.fileName || selectedDocumentFile.name,
+          originalName: selectedDocumentFile.name,
+          fileUrl: uploadResult?.media?.fileUrl,
+          fileType: selectedDocumentFile.type || uploadResult?.media?.mimeType || 'application/octet-stream',
+          fileSize: selectedDocumentFile.size || uploadResult?.media?.fileSize || 0,
+          uploadedBy: 'Admin',
+          category: selectedDocumentCategory,
+        }),
+      })
+
+      const createDocumentResult = await createDocumentResponse.json().catch(() => ({}))
+      if (!createDocumentResponse.ok) {
+        throw new Error(createDocumentResult?.error || 'Unable to save document record.')
+      }
+
+      setSelectedDocumentFile(null)
+      setSelectedDocumentCategory('Other')
+      setUploadModalOpen(false)
+      setDocumentsNotice('Document uploaded successfully.')
+      fetchDocuments()
+    } catch (err) {
+      console.error('Upload document failed', err)
+      setDocumentsNotice(err?.message || 'Unable to upload document right now.')
+    } finally {
+      setUploadingDocument(false)
+    }
+  }
+
+  const handleDeleteDocument = async (documentId) => {
+    if (!confirm('Delete this document?')) return
+
+    try {
+      const resp = await fetch(`/api/projects/${projectId}/documents?documentId=${documentId}`, { method: 'DELETE' })
+      if (resp.ok) {
+        fetchDocuments()
+      } else {
+        const result = await resp.json().catch(() => ({}))
+        setDocumentsNotice(result?.error || 'Unable to delete document.')
+      }
+    } catch (err) {
+      console.error('Failed to delete document', err)
+      setDocumentsNotice('Unable to delete document right now.')
+    }
+  }
+
+  const handleViewDocument = (doc) => {
+    const documentKind = getDocumentKind(doc)
+    const fileUrl = doc?.fileUrl
+
+    if (!fileUrl) {
+      setDocumentsNotice('No preview link is available for this document.')
+      return
+    }
+
+    if (documentKind === 'image' || documentKind === 'video') {
+      setPreviewDocument({ doc, kind: documentKind })
+      return
+    }
+
+    window.open(fileUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleDownloadDocument = (doc) => {
+    const fileUrl = doc?.fileUrl
+
+    if (!fileUrl) {
+      setDocumentsNotice('No download link is available for this document.')
+      return
+    }
+
+    const downloadLink = document.createElement('a')
+    downloadLink.href = fileUrl
+    downloadLink.target = '_blank'
+    downloadLink.rel = 'noopener noreferrer'
+    downloadLink.download = doc?.originalName || doc?.fileName || 'document'
+    document.body.appendChild(downloadLink)
+    downloadLink.click()
+    downloadLink.remove()
+  }
+
   useEffect(() => {
     if (activeTab === 'timeline') {
       fetchTimeline()
+    }
+
+    if (activeTab === 'documents') {
+      fetchDocuments()
     }
   }, [activeTab, projectId])
 
@@ -431,6 +604,222 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
                           Save
                         </button>
                       </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : activeTab === 'documents' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Project Documents</h2>
+                    <p className="text-sm text-gray-600">Upload and manage project files.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchDocuments()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDocumentsNotice('')
+                        setSelectedDocumentFile(null)
+                        setSelectedDocumentCategory('Other')
+                        setUploadModalOpen(true)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <UploadCloud className="h-4 w-4" />
+                      Upload Document
+                    </button>
+                  </div>
+                </div>
+
+                {documentsNotice ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    {documentsNotice}
+                  </div>
+                ) : null}
+
+                {documentsLoading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-sm font-medium text-gray-900">No documents uploaded yet.</p>
+                    <p className="mt-2 text-sm text-gray-600">Upload your first project document.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((doc) => {
+                      const documentName = doc.originalName || doc.fileName || 'Untitled document'
+                      const documentType = doc.fileType || 'Unknown'
+                      const uploadedBy = doc.uploadedBy || 'Admin'
+                      const uploadedAt = formatDate(doc.createdAt || doc.uploadedAt)
+                      const documentKind = getDocumentKind(doc)
+                      const viewLabel = documentKind === 'video' ? 'Play' : 'View'
+
+                      return (
+                        <div key={doc.id} className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+                              {documentKind === 'image' ? <FileImage className="h-5 w-5" /> : documentKind === 'video' ? <FileVideo className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-semibold text-gray-900">{documentName}</h3>
+                              <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
+                                <span>Type: {documentType}</span>
+                                <span>Size: {formatFileSize(doc.fileSize)}</span>
+                                <span>Uploaded: {uploadedAt}</span>
+                                <span>By: {uploadedBy}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleViewDocument(doc)}
+                              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                              {documentKind === 'video' ? <Play className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              {viewLabel}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadDocument(doc)}
+                              className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDocument(doc.id)}
+                              className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {previewDocument ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewDocument(null)}>
+                    <div className="w-full max-w-4xl rounded-2xl bg-white p-4 shadow-xl" onClick={(event) => event.stopPropagation()}>
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{previewDocument.doc.originalName || previewDocument.doc.fileName || 'Document Preview'}</h3>
+                          <p className="mt-1 text-sm text-gray-600">{previewDocument.kind === 'image' ? 'Image preview' : 'Video preview'}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewDocument(null)}
+                          className="rounded-md border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {previewDocument.kind === 'image' ? (
+                        <img src={previewDocument.doc.fileUrl} alt={previewDocument.doc.originalName || previewDocument.doc.fileName || 'Document preview'} className="max-h-[70vh] w-full rounded-xl object-contain" />
+                      ) : (
+                        <video src={previewDocument.doc.fileUrl} controls playsInline className="max-h-[70vh] w-full rounded-xl bg-black" />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {uploadModalOpen ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">Upload Project Document</h3>
+                          <p className="mt-1 text-sm text-gray-600">Choose a file and category before uploading.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadModalOpen(false)
+                            setSelectedDocumentFile(null)
+                            setSelectedDocumentCategory('Other')
+                          }}
+                          className="rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleUploadDocument} className="mt-5 space-y-4">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Select File</label>
+                          <input
+                            type="file"
+                            accept=".doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.mp4,.mov"
+                            onChange={(event) => setSelectedDocumentFile(event.target.files?.[0] || null)}
+                            className="block w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded file:border-0 file:bg-emerald-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Category</label>
+                          <select
+                            value={selectedDocumentCategory}
+                            onChange={(event) => setSelectedDocumentCategory(event.target.value)}
+                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                          >
+                            <option value="Agreement">Agreement</option>
+                            <option value="Drawing">Drawing</option>
+                            <option value="BOQ">BOQ</option>
+                            <option value="Site Photo">Site Photo</option>
+                            <option value="Site Video">Site Video</option>
+                            <option value="Invoice">Invoice</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadModalOpen(false)
+                              setSelectedDocumentFile(null)
+                              setSelectedDocumentCategory('Other')
+                            }}
+                            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={uploadingDocument}
+                            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                          >
+                            {uploadingDocument ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <UploadCloud className="h-4 w-4" />
+                                Upload
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
                     </div>
                   </div>
                 ) : null}

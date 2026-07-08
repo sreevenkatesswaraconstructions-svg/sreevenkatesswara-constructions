@@ -136,9 +136,27 @@ model Project {
   updatedAt DateTime @updatedAt
 
   timelines ProjectTimeline[]
+  documents ProjectDocument[]
 
   @@index([customerId])
   @@index([status])
+}
+
+model ProjectDocument {
+  id           String   @id @default(cuid())
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String
+  fileName     String
+  originalName String
+  fileUrl      String
+  fileType     String?
+  category     String?
+  fileSize     Int?
+  uploadedBy   String?
+  createdAt    DateTime @default(now())
+
+  @@index([projectId])
+  @@index([createdAt])
 }
 
 // ProjectTimeline model for project timelines/events

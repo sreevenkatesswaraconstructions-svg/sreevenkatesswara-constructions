@@ -40,15 +40,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Validate file type
     const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/webm']
-    const allowedTypes = [...allowedImageTypes, ...allowedVideoTypes]
+    const allowedDocumentTypes = [
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ]
+    const allowedTypes = [...allowedImageTypes, ...allowedVideoTypes, ...allowedDocumentTypes]
 
-    if (!allowedTypes.includes(file.mimetype || '')) {
+    const mimetype = file.mimetype || ''
+    if (!allowedTypes.includes(mimetype)) {
       return res.status(400).json({ error: 'Invalid file type' })
     }
 
     // Determine file type and directory
-    const fileType = allowedImageTypes.includes(file.mimetype || '') ? 'image' : 'video'
-    const uploadDir = fileType === 'image' ? 'images' : 'videos'
+    const fileType = allowedImageTypes.includes(mimetype) ? 'image' : allowedVideoTypes.includes(mimetype) ? 'video' : 'document'
+    const uploadDir = fileType === 'image' ? 'images' : fileType === 'video' ? 'videos' : 'documents'
     const maxSize = fileType === 'image' ? 10 * 1024 * 1024 : 100 * 1024 * 1024 // 10MB for images, 100MB for videos
 
     // Validate file size
@@ -78,9 +85,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Generate file URL
     //const fileUrl = `/uploads/${uploadDir}/${fileName}`
     // ===== CLOUDINARY UPLOAD =====
+    // Determine resource type based on file type
+    let resourceType: string = "auto"
+    if (fileType === "document") {
+      resourceType = "raw"
+    } else if (fileType === "image") {
+      resourceType = "image"
+    } else if (fileType === "video") {
+      resourceType = "video"
+    }
+
     const uploadResult = await cloudinary.uploader.upload(file.filepath, {
         folder: "sreevenkatesswara",
-        resource_type: "auto",
+        resource_type: resourceType,
     })
 
     await fs.unlink(file.filepath)
