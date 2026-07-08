@@ -115,6 +115,8 @@ export default function ProjectForm({
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState([])
   const [customerDetails, setCustomerDetails] = useState(customer)
+  const [customers, setCustomers] = useState([])
+  const [selectedCustomerId, setSelectedCustomerId] = useState(customerId || '')
   const [loadingCustomer, setLoadingCustomer] = useState(mode === 'create' && Boolean(customerId))
 
   useEffect(() => {
@@ -128,24 +130,28 @@ export default function ProjectForm({
       return
     }
 
-    if (!customerId) {
-      router.replace('/admin/customers')
-      return
-    }
-
-    const loadCustomer = async () => {
+    const loadCustomers = async () => {
       try {
-        setLoadingCustomer(true)
+        setLoadingCustomer(Boolean(selectedCustomerId))
         setError('')
         const response = await fetch('/api/customers')
         const result = await response.json()
 
         if (result?.success) {
-          const selectedCustomer = (result.data || []).find((item) => String(item.id) === String(customerId)) || null
-          setCustomerDetails(selectedCustomer)
+          const customerList = result.data || []
+          setCustomers(customerList)
 
-          if (!selectedCustomer) {
-            setError('The selected customer could not be found.')
+          const resolvedCustomerId = selectedCustomerId || customerId || ''
+          if (resolvedCustomerId) {
+            const selectedCustomer = customerList.find((item) => String(item.id) === String(resolvedCustomerId)) || null
+            setSelectedCustomerId(resolvedCustomerId)
+            setCustomerDetails(selectedCustomer)
+
+            if (!selectedCustomer) {
+              setError('The selected customer could not be found.')
+            }
+          } else {
+            setCustomerDetails(null)
           }
         } else {
           setError(result?.message || 'Failed to load customer details')
@@ -158,8 +164,8 @@ export default function ProjectForm({
       }
     }
 
-    loadCustomer()
-  }, [customerId, mode, router])
+    loadCustomers()
+  }, [customerId, mode, selectedCustomerId])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -171,7 +177,7 @@ export default function ProjectForm({
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    if (mode === 'create' && (!customerId || !customerDetails)) {
+    if (mode === 'create' && (!selectedCustomerId || !customerDetails)) {
       setError('A valid customer is required to create a project.')
       return
     }
@@ -199,7 +205,7 @@ export default function ProjectForm({
         estimatedBudget: formData.estimatedBudget.trim(),
         projectManager: formData.projectManager.trim(),
         status: formData.status.trim(),
-        customerId: initialProject?.customerId || customerId || null,
+        customerId: initialProject?.customerId || selectedCustomerId || null,
         customerName: customerDetails?.name || initialProject?.clientName || initialProject?.customerName || '',
       }
 
@@ -218,7 +224,7 @@ export default function ProjectForm({
         throw new Error(result?.error || (mode === 'edit' ? 'Failed to update project' : 'Failed to create project'))
       }
 
-      router.push(successHref || (mode === 'edit' ? `/admin/projects/${projectId}` : `/admin/customers/${customerId}?tab=projects`))
+      router.push(successHref || (mode === 'edit' ? `/admin/projects/${projectId}` : `/admin/customers/${selectedCustomerId || customerId}?tab=projects`))
     } catch (err) {
       console.error(mode === 'edit' ? 'Failed to update project' : 'Failed to create project', err)
       setError(err.message || (mode === 'edit' ? 'Unable to update the project right now.' : 'Unable to create the project right now.'))
@@ -253,7 +259,7 @@ export default function ProjectForm({
             <div className="mb-6 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
               <p className="text-sm font-semibold text-emerald-700">Selected Customer</p>
               <p className="mt-1 text-lg font-semibold text-gray-900">{customerDetails?.name || 'Customer not found'}</p>
-              <p className="text-sm text-gray-600">Customer ID: {customerDetails?.id || customerId}</p>
+              <p className="text-sm text-gray-600">Customer ID: {customerDetails?.id || selectedCustomerId || customerId}</p>
             </div>
           ) : (
             <div className="mb-6 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
@@ -262,6 +268,32 @@ export default function ProjectForm({
               <p className="text-sm text-gray-600">Customer ID: {initialProject?.customerId || customerId || 'Not assigned'}</p>
             </div>
           )}
+
+          {mode === 'create' ? (
+            <div className="mb-6">
+              <label className="mb-2 block text-sm font-semibold text-gray-700">Customer</label>
+              <select
+                value={selectedCustomerId}
+                onChange={(event) => {
+                  const nextCustomerId = event.target.value
+                  setSelectedCustomerId(nextCustomerId)
+                  setCustomerDetails(customers.find((item) => String(item.id) === String(nextCustomerId)) || null)
+                  if (error) {
+                    setError('')
+                  }
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
+              >
+                <option value="">Select a customer</option>
+                {customers.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name || item.email || item.id}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-sm text-gray-500">Choose the customer for this project. You can change it before saving.</p>
+            </div>
+          ) : null}
 
           {error ? (
             <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
@@ -380,7 +412,7 @@ export default function ProjectForm({
               </Link>
               <button
                 type="submit"
-                disabled={submitting || (mode === 'create' && (!customerId || !customerDetails))}
+                disabled={submitting || (mode === 'create' && (!selectedCustomerId || !customerDetails))}
                 className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
               >
                 {submitting ? (mode === 'edit' ? 'Saving changes...' : 'Saving...') : submitLabel}

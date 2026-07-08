@@ -280,14 +280,24 @@ export default function CustomerDetailsPage() {
                     <h2 className="text-xl font-semibold text-gray-900">Projects</h2>
                     <p className="text-sm text-gray-600">Projects linked to this customer.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => loadProjects()}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
-                  </button>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/admin/projects/create?customerId=${customerId}`)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Project
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadProjects()}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 {projectsLoading ? (
