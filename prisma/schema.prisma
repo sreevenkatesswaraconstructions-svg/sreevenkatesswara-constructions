@@ -191,9 +191,27 @@ model Project {
   payments  ProjectPayment[]
   labours   Labour[]
   materials Material[]
+  progressHistory ProjectProgress[]
 
   @@index([customerId])
   @@index([status])
+}
+
+model ProjectProgress {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  stage      String
+  percentage Int
+  notes      String?
+
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([createdAt])
 }
 
 model ProjectPayment {

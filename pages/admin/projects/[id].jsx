@@ -39,6 +39,26 @@ const labourRoleOptions = [
 
 const labourStatusOptions = ['ACTIVE', 'INACTIVE']
 
+const progressStageOptions = [
+  'Planning',
+  'Site Preparation',
+  'Foundation',
+  'Columns',
+  'Ground Floor',
+  'First Floor',
+  'Roof Slab',
+  'Brick Work',
+  'Plastering',
+  'Electrical',
+  'Plumbing',
+  'Flooring',
+  'Painting',
+  'Interior',
+  'Exterior',
+  'Final Inspection',
+  'Completed',
+]
+
 function formatDate(value) {
   if (!value) return '-'
 
@@ -160,6 +180,17 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
     unitPrice: '',
     supplier: '',
     notes: '',
+  })
+  const [progress, setProgress] = useState([])
+  const [progressLoading, setProgressLoading] = useState(false)
+  const [progressNotice, setProgressNotice] = useState('')
+  const [progressModalOpen, setProgressModalOpen] = useState(false)
+  const [savingProgress, setSavingProgress] = useState(false)
+  const [progressForm, setProgressForm] = useState({
+    stage: 'Planning',
+    percentage: '',
+    notes: '',
+    updatedBy: 'Admin',
   })
   const [editingPaymentId, setEditingPaymentId] = useState(null)
   const [savingPayment, setSavingPayment] = useState(false)
@@ -328,6 +359,84 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
     }
   }
 
+  const fetchProgress = async () => {
+    if (!projectId) return
+    try {
+      setProgressLoading(true)
+      setProgressNotice('')
+      const resp = await fetch(`/api/projects/${projectId}/progress`)
+      if (resp.ok) {
+        const data = await resp.json()
+        setProgress(Array.isArray(data) ? data : [])
+      } else {
+        setProgress([])
+        const result = await resp.json().catch(() => ({}))
+        setProgressNotice(result?.error || 'Unable to load project progress.')
+      }
+    } catch (err) {
+      console.error('Failed to load project progress', err)
+      setProgress([])
+      setProgressNotice('Unable to load project progress right now.')
+    } finally {
+      setProgressLoading(false)
+    }
+  }
+
+  const openProgressModal = () => {
+    setProgressForm({
+      stage: 'Planning',
+      percentage: '',
+      notes: '',
+      updatedBy: 'Admin',
+    })
+    setProgressNotice('')
+    setProgressModalOpen(true)
+  }
+
+  const handleSaveProgress = async (event) => {
+    event.preventDefault()
+
+    if (!projectId) return
+
+    const percentage = Number(progressForm.percentage)
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+      setProgressNotice('Please enter a valid progress percentage between 0 and 100.')
+      return
+    }
+
+    try {
+      setSavingProgress(true)
+      setProgressNotice('')
+
+      const response = await fetch(`/api/projects/${projectId}/progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stage: progressForm.stage,
+          percentage,
+          notes: progressForm.notes,
+          updatedBy: progressForm.updatedBy || 'Admin',
+        }),
+      })
+
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(result?.error || 'Unable to save project progress.')
+      }
+
+      setProgressModalOpen(false)
+      setProgressForm({ stage: 'Planning', percentage: '', notes: '', updatedBy: 'Admin' })
+      await fetchProgress()
+      setProgressNotice('Progress updated successfully.')
+      toast.success('Progress updated successfully.')
+    } catch (err) {
+      console.error('Failed to save project progress', err)
+      setProgressNotice(err?.message || 'Unable to save project progress right now.')
+    } finally {
+      setSavingProgress(false)
+    }
+  }
+
   const handleUploadDocument = async (event) => {
     event.preventDefault()
 
@@ -456,6 +565,10 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
 
     if (activeTab === 'materials') {
       fetchMaterials()
+    }
+
+    if (activeTab === 'progress') {
+      fetchProgress()
     }
   }, [activeTab, projectId])
 
@@ -2009,6 +2122,211 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
                               </>
                             ) : (
                               editingMaterialId ? 'Update Material' : 'Save Material'
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : activeTab === 'progress' ? (
+              <div className="space-y-6">
+                {/* Header with Buttons */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Project Progress</h2>
+                    <p className="text-sm text-gray-600">Track project completion stages and milestones.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchProgress()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openProgressModal}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Update Progress
+                    </button>
+                  </div>
+                </div>
+
+                {progressNotice ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    {progressNotice}
+                  </div>
+                ) : null}
+
+                {progressLoading ? (
+                  <div className="flex items-center justify-center p-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                ) : progress.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-sm font-medium text-gray-900">No progress updates yet.</p>
+                    <p className="mt-2 text-sm text-gray-600">Add your first project progress update.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Overall Progress Card */}
+                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <h3 className="text-sm font-semibold text-gray-700">Overall Progress</h3>
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl font-bold text-emerald-600">{progress[0]?.percentage || 0}%</span>
+                        </div>
+                        <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div
+                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500"
+                            style={{ width: `${progress[0]?.percentage || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary Card */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-xl border border-gray-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Stage</p>
+                        <p className="mt-2 text-sm font-medium text-gray-900">{progress[0]?.stage || '-'}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Last Updated</p>
+                        <p className="mt-2 text-sm font-medium text-gray-900">
+                          {progress[0]?.createdAt ? new Date(progress[0].createdAt).toLocaleString() : '-'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* History Section */}
+                    <div>
+                      <h3 className="mb-4 text-sm font-semibold text-gray-900">Progress History</h3>
+                      <div className="space-y-3">
+                        {progress.map((item, index) => (
+                          <div key={item.id || index} className="rounded-lg border border-gray-200 bg-white p-4 hover:border-emerald-300 hover:shadow-sm transition">
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3">
+                                  <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 w-10 h-10">
+                                    <span className="text-sm font-semibold text-emerald-700">{item.percentage}%</span>
+                                  </span>
+                                  <h4 className="font-semibold text-gray-900">{item.stage}</h4>
+                                </div>
+                                {item.notes ? (
+                                  <p className="mt-2 text-sm text-gray-600">{item.notes}</p>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-3 border-t border-gray-100 pt-3">
+                              <span>By: {item.updatedBy || 'Admin'}</span>
+                              <span>•</span>
+                              <span>{item.createdAt ? new Date(item.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {progressModalOpen ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-xl">
+                      <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">Update Project Progress</h3>
+                          <p className="text-sm text-gray-600">Record the latest milestone and completion percentage.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setProgressModalOpen(false)}
+                          className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSaveProgress} className="space-y-4 px-6 py-5">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Stage</label>
+                            <select
+                              value={progressForm.stage}
+                              onChange={(event) => setProgressForm((prev) => ({ ...prev, stage: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              required
+                            >
+                              {progressStageOptions.map((stage) => (
+                                <option key={stage} value={stage}>
+                                  {stage}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Progress (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={progressForm.percentage}
+                              onChange={(event) => setProgressForm((prev) => ({ ...prev, percentage: event.target.value }))}
+                              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Notes</label>
+                          <textarea
+                            value={progressForm.notes}
+                            onChange={(event) => setProgressForm((prev) => ({ ...prev, notes: event.target.value }))}
+                            className="min-h-[110px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                            placeholder="Optional progress notes"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-gray-700">Updated By</label>
+                          <input
+                            type="text"
+                            value={progressForm.updatedBy}
+                            onChange={(event) => setProgressForm((prev) => ({ ...prev, updatedBy: event.target.value }))}
+                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                            placeholder="Admin"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 border-t border-gray-200 pt-4">
+                          <button
+                            type="button"
+                            onClick={() => setProgressModalOpen(false)}
+                            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingProgress}
+                            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                          >
+                            {savingProgress ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              'Save Progress'
                             )}
                           </button>
                         </div>
