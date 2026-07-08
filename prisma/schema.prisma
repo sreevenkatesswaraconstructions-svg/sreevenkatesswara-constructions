@@ -135,8 +135,26 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  timelines ProjectTimeline[]
+
   @@index([customerId])
   @@index([status])
+}
+
+// ProjectTimeline model for project timelines/events
+model ProjectTimeline {
+  id          String   @id @default(cuid())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  title       String
+  description String?
+  type        String   @default("Other")
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([createdAt])
 }
 
 // Blog model for CMS-style blog management

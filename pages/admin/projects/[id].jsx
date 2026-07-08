@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, RefreshCw, Users, MapPin, Box, Wrench, CreditCard, Flag, Info, Edit2, Trash2, Plus } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import { prisma } from '../../../lib/prisma'
 
@@ -77,6 +77,13 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('information')
   const [editNotice, setEditNotice] = useState('')
+  const [timeline, setTimeline] = useState([])
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [formType, setFormType] = useState('Update')
+  const [formTitle, setFormTitle] = useState('')
+  const [formDescription, setFormDescription] = useState('')
+  const [editingEventId, setEditingEventId] = useState(null)
 
   useEffect(() => {
     if (!projectId) return
@@ -111,6 +118,32 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
 
     loadProject()
   }, [initialProject, initialCustomer, projectId])
+
+  // Timeline fetcher
+  const fetchTimeline = async () => {
+    if (!projectId) return
+    try {
+      setTimelineLoading(true)
+      const resp = await fetch(`/api/projects/${projectId}/timeline`)
+      if (resp.ok) {
+        const data = await resp.json()
+        setTimeline(Array.isArray(data) ? data : [])
+      } else {
+        setTimeline([])
+      }
+    } catch (err) {
+      console.error('Failed to load timeline', err)
+      setTimeline([])
+    } finally {
+      setTimelineLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'timeline') {
+      fetchTimeline()
+    }
+  }, [activeTab, projectId])
 
   const infoItems = useMemo(() => {
     if (!project) return []
@@ -234,6 +267,173 @@ export default function ProjectDetailsPage({ initialProject, initialCustomer }) 
                     <p className="mt-2 text-sm font-medium text-gray-900">{item.value}</p>
                   </div>
                 ))}
+              </div>
+            ) : activeTab === 'timeline' ? (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Project Timeline</h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchTimeline()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingEventId(null); setFormTitle(''); setFormDescription(''); setFormType('Update'); setIsModalOpen(true) }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Timeline Event
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {timelineLoading ? (
+                    <div className="flex items-center justify-center p-6">
+                      <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                    </div>
+                  ) : timeline.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                      <p className="text-sm text-gray-600">No timeline events yet. Add one using the button above.</p>
+                    </div>
+                  ) : (
+                    timeline.map((ev) => {
+                      const type = ev.type || 'Other'
+                      const icon = {
+                        Update: <RefreshCw className="h-5 w-5 text-slate-600" />,
+                        Meeting: <Users className="h-5 w-5 text-slate-600" />,
+                        'Site Visit': <MapPin className="h-5 w-5 text-slate-600" />,
+                        Material: <Box className="h-5 w-5 text-slate-600" />,
+                        Labour: <Wrench className="h-5 w-5 text-slate-600" />,
+                        Payment: <CreditCard className="h-5 w-5 text-slate-600" />,
+                        Milestone: <Flag className="h-5 w-5 text-slate-600" />,
+                        Other: <Info className="h-5 w-5 text-slate-600" />,
+                      }[type] || <Info className="h-5 w-5 text-slate-600" />
+
+                      return (
+                        <div key={ev.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <div className="rounded-lg bg-gray-50 p-2">{icon}</div>
+                              <div>
+                                <h3 className="text-sm font-semibold text-gray-900">{ev.title}</h3>
+                                <p className="mt-1 text-sm text-gray-600">{ev.description}</p>
+                                <p className="mt-2 text-xs text-gray-500">{new Date(ev.createdAt).toLocaleString()} • {ev.createdBy || 'Admin'}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingEventId(ev.id)
+                                  setFormTitle(ev.title || '')
+                                  setFormDescription(ev.description || '')
+                                  setFormType(ev.type || 'Other')
+                                  setIsModalOpen(true)
+                                }}
+                                className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!confirm('Are you sure you want to delete this timeline event?')) return
+                                  try {
+                                    const resp = await fetch(`/api/projects/${project.id}/timeline?eventId=${ev.id}`, { method: 'DELETE' })
+                                    if (resp.ok || resp.status === 204) {
+                                      fetchTimeline()
+                                    } else {
+                                      alert('Failed to delete event')
+                                    }
+                                  } catch (err) {
+                                    console.error(err)
+                                    alert('Error deleting event')
+                                  }
+                                }}
+                                className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+
+                {isModalOpen ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="w-full max-w-lg rounded-lg bg-white p-6">
+                      <h3 className="text-lg font-semibold text-gray-900">{editingEventId ? 'Edit Timeline Event' : 'Add Timeline Event'}</h3>
+
+                      <div className="mt-4 grid gap-3">
+                        <label className="text-sm font-medium text-gray-700">Event Type</label>
+                        <select value={formType} onChange={(e) => setFormType(e.target.value)} className="rounded-md border border-gray-200 p-2">
+                          <option>Update</option>
+                          <option>Meeting</option>
+                          <option>Site Visit</option>
+                          <option>Material</option>
+                          <option>Labour</option>
+                          <option>Payment</option>
+                          <option>Milestone</option>
+                          <option>Other</option>
+                        </select>
+
+                        <label className="text-sm font-medium text-gray-700">Title</label>
+                        <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} className="rounded-md border border-gray-200 p-2" />
+
+                        <label className="text-sm font-medium text-gray-700">Description</label>
+                        <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} className="min-h-[100px] rounded-md border border-gray-200 p-2" />
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-end gap-2">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">Cancel</button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!formTitle) { alert('Title is required'); return }
+                            try {
+                              if (editingEventId) {
+                                const resp = await fetch(`/api/projects/${project.id}/timeline?eventId=${editingEventId}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ title: formTitle, description: formDescription, type: formType }),
+                                })
+                                if (!resp.ok) throw new Error('Failed to update')
+                              } else {
+                                const resp = await fetch(`/api/projects/${project.id}/timeline`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ title: formTitle, description: formDescription, type: formType, createdBy: 'Admin' }),
+                                })
+                                if (!resp.ok) throw new Error('Failed to create')
+                              }
+                              setIsModalOpen(false)
+                              fetchTimeline()
+                            } catch (err) {
+                              console.error(err)
+                              alert('Error saving event')
+                            }
+                          }}
+                          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
