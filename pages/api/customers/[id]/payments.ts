@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const timelinePayments = await prisma.customerTimeline.findMany({ where: { customerId: id, eventType: 'Payment' }, orderBy: { createdAt: 'desc' } })
     let totalPaid = 0
-    let lastPaymentDate = null
+    let lastPaymentDate: Date | null = null
     for (const t of timelinePayments) {
       try {
         const data = JSON.parse(t.description || '{}')
