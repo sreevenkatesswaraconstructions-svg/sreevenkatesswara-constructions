@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'react-hot-toast'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { ArrowLeft, Loader2, Plus, RefreshCw, Info, MapPin, Box, Wrench, CreditCard, Flag, Users, Phone, MessageSquare, Mail, ReceiptText, FileText, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, RefreshCw, MapPin, Box, Wrench, CreditCard, Flag, Users, Phone, MessageSquare, Mail, ReceiptText, FileText, CalendarDays } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import DashboardCard from '../../../components/admin/DashboardCard'
 
 const tabs = [
   ['information', 'Information'],
   ['timeline', 'Timeline'],
-  ['contact-history', 'Contact History'],
   ['projects', 'Projects'],
   ['quotations', 'Quotations'],
   ['invoices', 'Invoices'],
@@ -252,68 +251,6 @@ export default function CustomerDetailsPage() {
     loadTimeline()
   }, [activeTab, customerId])
 
-  // Load contact history when tab is active
-  useEffect(() => {
-    if (!customerId || activeTab !== 'contact-history') return
-
-    const loadContactHistory = async () => {
-      try {
-        setContactLoading(true)
-        setContactError('')
-        const response = await fetch(`/api/customers/${customerId}/contact-history`)
-        const result = await response.json()
-        if (Array.isArray(result)) {
-          setContactHistory(result)
-        } else if (result?.success && Array.isArray(result.data)) {
-          setContactHistory(result.data)
-        } else {
-          setContactHistory([])
-          setContactError(result?.message || 'Unable to load contact history right now.')
-        }
-      } catch (err) {
-        console.error('Failed to load contact history', err)
-        setContactError('Unable to load contact history right now.')
-      } finally {
-        setContactLoading(false)
-      }
-    }
-
-    loadContactHistory()
-  }, [activeTab, customerId])
-
-  const submitContactNote = async () => {
-    if (!customerId) return
-    setAddingContact(true)
-    try {
-      const body = {
-        type: newContactType,
-        title: newContactTitle || `${newContactType}`,
-        description: newContactDescription || '',
-      }
-      const res = await fetch(`/api/customers/${customerId}/contact-history`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const result = await res.json()
-      if (res.ok) {
-        setNewContactTitle('')
-        setNewContactDescription('')
-        setShowAddContactForm(false)
-        // reload
-        setContactHistory((prev) => [result, ...prev])
-      } else {
-        console.error('Failed to add contact note', result)
-        alert(result?.message || 'Failed to add contact note')
-      }
-    } catch (err) {
-      console.error('Failed to add contact note', err)
-      alert('Failed to add contact note')
-    } finally {
-      setAddingContact(false)
-    }
-  }
-
   const customer = useMemo(() => {
     if (!customerId) return null
     return customers.find((item) => String(item.id) === String(customerId)) || null
@@ -353,14 +290,6 @@ export default function CustomerDetailsPage() {
   const phoneAvailable = Boolean(customer?.phone)
   const emailAvailable = Boolean(customer?.email)
   const phoneDigits = phoneAvailable ? String(customer.phone).replace(/\D/g, '') : ''
-  const [contactHistory, setContactHistory] = useState([])
-  const [contactLoading, setContactLoading] = useState(false)
-  const [contactError, setContactError] = useState('')
-  const [showAddContactForm, setShowAddContactForm] = useState(false)
-  const [newContactType, setNewContactType] = useState('Phone Call')
-  const [newContactTitle, setNewContactTitle] = useState('')
-  const [newContactDescription, setNewContactDescription] = useState('')
-  const [addingContact, setAddingContact] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [paymentForm, setPaymentForm] = useState({ paymentDate: '', amountPaid: '', method: 'Cash', referenceNumber: '', notes: '' })
@@ -554,16 +483,7 @@ export default function CustomerDetailsPage() {
                 {phoneAvailable ? (
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        await fetch(`/api/customers/${customerId}/contact-history`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ type: 'Phone Call', title: 'Phone call initiated', description: '' }),
-                        })
-                      } catch (e) {
-                        console.error('Failed to log call', e)
-                      }
+                    onClick={() => {
                       window.location.href = `tel:${customer.phone}`
                     }}
                     aria-label="Call customer"
@@ -588,16 +508,7 @@ export default function CustomerDetailsPage() {
                 {phoneAvailable ? (
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        await fetch(`/api/customers/${customerId}/contact-history`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ type: 'WhatsApp', title: 'WhatsApp opened', description: '' }),
-                        })
-                      } catch (e) {
-                        console.error('Failed to log whatsapp', e)
-                      }
+                    onClick={() => {
                       window.open(`https://wa.me/${phoneDigits}`, '_blank')
                     }}
                     aria-label="Open WhatsApp chat"
@@ -622,16 +533,7 @@ export default function CustomerDetailsPage() {
                 {emailAvailable ? (
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        await fetch(`/api/customers/${customerId}/contact-history`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ type: 'Email', title: 'Email started', description: '' }),
-                        })
-                      } catch (e) {
-                        console.error('Failed to log email', e)
-                      }
+                    onClick={() => {
                       window.location.href = `mailto:${customer.email}`
                     }}
                     aria-label="Email customer"
@@ -687,80 +589,6 @@ export default function CustomerDetailsPage() {
                     <p className="mt-2 text-sm font-medium text-gray-900">{item.value}</p>
                   </div>
                 ))}
-              </div>
-            ) : activeTab === 'contact-history' ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Contact History</h2>
-                    <p className="text-sm text-gray-600">Chronological history of communications and important interactions.</p>
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddContactForm((s) => !s)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Contact Note
-                    </button>
-                  </div>
-                </div>
-
-                {showAddContactForm && (
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <select value={newContactType} onChange={(e) => setNewContactType(e.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                        <option>Phone Call</option>
-                        <option>WhatsApp</option>
-                        <option>Email</option>
-                        <option>Enquiry Created</option>
-                        <option>Quotation Created</option>
-                        <option>Invoice Created</option>
-                        <option>Payment Recorded</option>
-                        <option>Manual Note</option>
-                      </select>
-                      <input value={newContactTitle} onChange={(e) => setNewContactTitle(e.target.value)} placeholder="Title" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" />
-                      <div className="flex items-center justify-end gap-2">
-                        <button type="button" onClick={() => { setShowAddContactForm(false); setNewContactTitle(''); setNewContactDescription('') }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700">Cancel</button>
-                        <button type="button" onClick={submitContactNote} disabled={addingContact} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">{addingContact ? 'Saving…' : 'Save'}</button>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <textarea value={newContactDescription} onChange={(e) => setNewContactDescription(e.target.value)} placeholder="Description" className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" rows={4} />
-                    </div>
-                  </div>
-                )}
-
-                {contactLoading ? (
-                  <div className="flex items-center gap-2 text-gray-600"><Loader2 className="h-5 w-5 animate-spin text-emerald-600" /> Loading contact history...</div>
-                ) : contactError ? (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{contactError}</div>
-                ) : contactHistory.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">No contact history available.</div>
-                ) : (
-                  <div className="space-y-4">
-                    {contactHistory.map((entry) => (
-                      <div key={entry.id} className="rounded-xl border border-gray-200 bg-white p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="mt-1">
-                            {entry.type === 'Phone Call' && <Phone className="h-5 w-5 text-gray-600" />}
-                            {entry.type === 'WhatsApp' && <MessageSquare className="h-5 w-5 text-gray-600" />}
-                            {entry.type === 'Email' && <Mail className="h-5 w-5 text-gray-600" />}
-                            {!['Phone Call','WhatsApp','Email'].includes(entry.type) && <Info className="h-5 w-5 text-gray-600" />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm font-semibold text-gray-900">{entry.title || entry.type}</div>
-                              <div className="text-xs text-gray-500">{new Date(entry.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                            </div>
-                            {entry.description ? <p className="mt-2 text-sm text-gray-700">{entry.description}</p> : null}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             ) : activeTab === 'projects' ? (
               <div className="space-y-4">
