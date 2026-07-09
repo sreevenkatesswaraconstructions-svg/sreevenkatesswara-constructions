@@ -69,6 +69,9 @@ export default function CustomerDetailsPage() {
   const [timelineLoading, setTimelineLoading] = useState(false)
   const [timelineError, setTimelineError] = useState('')
   const [quotations, setQuotations] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [invoicesLoading, setInvoicesLoading] = useState(false)
+  const [invoicesError, setInvoicesError] = useState('')
   const [quotationsLoading, setQuotationsLoading] = useState(false)
   const [quotationsError, setQuotationsError] = useState('')
 
@@ -151,6 +154,31 @@ export default function CustomerDetailsPage() {
 
   useEffect(() => {
     loadQuotations()
+  }, [activeTab, customerId])
+
+  const loadInvoices = async () => {
+    if (!customerId || activeTab !== 'invoices') return
+
+    try {
+      setInvoicesLoading(true)
+      setInvoicesError('')
+      const response = await fetch(`/api/customers/${customerId}/invoices`)
+      const result = await response.json()
+      if (Array.isArray(result)) {
+        setInvoices(result)
+      } else {
+        setInvoicesError(result?.message || 'Unable to load invoices right now.')
+      }
+    } catch (err) {
+      console.error('Failed to load customer invoices', err)
+      setInvoicesError('Unable to load invoices right now.')
+    } finally {
+      setInvoicesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadInvoices()
   }, [activeTab, customerId])
 
   useEffect(() => {
@@ -428,6 +456,74 @@ export default function CustomerDetailsPage() {
                         <div className="mt-5 flex items-center justify-end">
                           <Link href={`/admin/quotations/${quotation.id}`} className="inline-flex items-center text-sm font-semibold text-emerald-600 hover:text-emerald-700">
                             Open Quotation
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'invoices' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Invoices</h2>
+                    <p className="text-sm text-gray-600">Invoices linked to this customer.</p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/admin/invoices/create?customerId=${customerId}`)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Invoice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadInvoices()}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {invoicesLoading ? (
+                  <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+                      Loading invoices...
+                    </div>
+                  </div>
+                ) : invoicesError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{invoicesError}</div>
+                ) : invoices.length === 0 ? (
+                  <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-lg font-semibold text-gray-900">No invoices available for this customer.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {invoices.map((invoice) => (
+                      <div key={invoice.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{invoice.invoiceNumber || 'Untitled Invoice'}</h3>
+                            <p className="mt-1 text-sm text-gray-600">{invoice.status || 'Saved'}</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {invoice.status || 'Saved'}
+                          </span>
+                        </div>
+                        <div className="mt-4 space-y-2 text-sm text-gray-600">
+                          <p><span className="font-medium text-gray-700">Total Amount:</span> {invoice.totalAmount ? `₹${Number(invoice.totalAmount).toLocaleString('en-IN')}` : '-'}</p>
+                          <p><span className="font-medium text-gray-700">Due Date:</span> {formatDate(invoice.dueDate)}</p>
+                          <p><span className="font-medium text-gray-700">Created Date:</span> {formatDate(invoice.createdAt)}</p>
+                        </div>
+                        <div className="mt-5 flex items-center justify-end">
+                          <Link href={`/admin/invoices/${invoice.id}`} className="inline-flex items-center text-sm font-semibold text-emerald-600 hover:text-emerald-700">
+                            Open Invoice
                           </Link>
                         </div>
                       </div>

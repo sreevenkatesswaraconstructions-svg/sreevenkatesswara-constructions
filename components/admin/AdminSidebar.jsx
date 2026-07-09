@@ -20,6 +20,7 @@ const menuItems = [
   { name: 'Enquiries', icon: MessageSquare, path: '/admin/enquiries' },
   { name: 'Customers', icon: Users, path: '/admin/customers' },
   { name: 'Quotations', icon: FileText, path: '/admin/quotations' },
+  { name: 'Invoices', icon: FileText, path: '/admin/invoices' },
   { name: 'Projects', icon: FolderKanban, path: '/admin/projects' },
   { name: 'Blogs', icon: FileText, path: '/admin/blogs' },
   { name: 'Services', icon: Building2, path: '/admin/services' },
