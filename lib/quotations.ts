@@ -128,6 +128,7 @@ export const serializeQuotationPayload = async (input: QuotationPayload = {}, op
 
   const payload = {
     quotationNumber: (input?.quotationNumber || options.quotationNumber || '').toString().trim(),
+    customerId: input?.customerId ? String(input.customerId) : null,
     customerName: String(input?.customerName ?? '').trim(),
     customerPhone: String(input?.customerPhone ?? '').trim(),
     customerEmail: String(input?.customerEmail ?? '').trim(),

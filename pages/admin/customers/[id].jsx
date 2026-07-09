@@ -68,6 +68,9 @@ export default function CustomerDetailsPage() {
   const [timeline, setTimeline] = useState([])
   const [timelineLoading, setTimelineLoading] = useState(false)
   const [timelineError, setTimelineError] = useState('')
+  const [quotations, setQuotations] = useState([])
+  const [quotationsLoading, setQuotationsLoading] = useState(false)
+  const [quotationsError, setQuotationsError] = useState('')
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -123,6 +126,31 @@ export default function CustomerDetailsPage() {
 
   useEffect(() => {
     loadProjects()
+  }, [activeTab, customerId])
+
+  const loadQuotations = async () => {
+    if (!customerId || activeTab !== 'quotations') return
+
+    try {
+      setQuotationsLoading(true)
+      setQuotationsError('')
+      const response = await fetch(`/api/customers/${customerId}/quotations`)
+      const result = await response.json()
+      if (Array.isArray(result)) {
+        setQuotations(result)
+      } else {
+        setQuotationsError(result?.message || 'Unable to load quotations right now.')
+      }
+    } catch (err) {
+      console.error('Failed to load customer quotations', err)
+      setQuotationsError('Unable to load quotations right now.')
+    } finally {
+      setQuotationsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadQuotations()
   }, [activeTab, customerId])
 
   useEffect(() => {
@@ -333,6 +361,73 @@ export default function CustomerDetailsPage() {
                         <div className="mt-5 flex items-center justify-end">
                           <Link href={`/admin/projects/${project.id}`} className="inline-flex items-center text-sm font-semibold text-emerald-600 hover:text-emerald-700">
                             Open Project
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'quotations' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Quotations</h2>
+                    <p className="text-sm text-gray-600">Quotations linked to this customer.</p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/admin/quotations/create?customerId=${customerId}`)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Quotation
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadQuotations()}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {quotationsLoading ? (
+                  <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+                      Loading quotations...
+                    </div>
+                  </div>
+                ) : quotationsError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{quotationsError}</div>
+                ) : quotations.length === 0 ? (
+                  <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                    <p className="text-lg font-semibold text-gray-900">No quotations available for this customer.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {quotations.map((quotation) => (
+                      <div key={quotation.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{quotation.quotationNumber || 'Untitled Quotation'}</h3>
+                            <p className="mt-1 text-sm text-gray-600">{quotation.projectName || 'Quotation'}</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {quotation.status || 'Saved'}
+                          </span>
+                        </div>
+                        <div className="mt-4 space-y-2 text-sm text-gray-600">
+                          <p><span className="font-medium text-gray-700">Total Amount:</span> {quotation.grandTotal ? `₹${Number(quotation.grandTotal).toLocaleString('en-IN')}` : '-'}</p>
+                          <p><span className="font-medium text-gray-700">Created Date:</span> {formatDate(quotation.createdAt)}</p>
+                        </div>
+                        <div className="mt-5 flex items-center justify-end">
+                          <Link href={`/admin/quotations/${quotation.id}`} className="inline-flex items-center text-sm font-semibold text-emerald-600 hover:text-emerald-700">
+                            Open Quotation
                           </Link>
                         </div>
                       </div>

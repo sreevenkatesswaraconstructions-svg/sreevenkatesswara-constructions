@@ -14,6 +14,11 @@ export default function QuotationBuilder({ quotationId }){
     : Array.isArray(router.query?.enquiryId)
       ? router.query.enquiryId[0]
       : null
+  const customerIdFromQuery = typeof router.query?.customerId === 'string'
+    ? router.query.customerId
+    : Array.isArray(router.query?.customerId)
+      ? router.query.customerId[0]
+      : null
 
   const [data, setData] = useState({ boq: [], paymentSchedule: [], terms: DEFAULT_QUOTATION_TERMS, notes: DEFAULT_QUOTATION_NOTES, attachments: [], subtotal:0, gstTotal:0, gstPercent:0, discount:0, discountPercent:0, subtotalAfterDiscount:0, grandTotal:0 })
   const [customProjectTypeEnabled, setCustomProjectTypeEnabled] = useState(false)
@@ -252,6 +257,23 @@ export default function QuotationBuilder({ quotationId }){
           return
         }
 
+        if (customerIdFromQuery) {
+          const customerRes = await fetch(`/api/customers/${customerIdFromQuery}`)
+          const customerJson = await customerRes.json()
+          const customerData = customerJson && customerJson.success ? (customerJson.data || null) : customerJson
+
+          if (mounted && customerData) {
+            setData(prev => ({
+              ...prev,
+              customerId: customerIdFromQuery,
+              customerName: customerData.name || prev.customerName || '',
+              customerPhone: customerData.phone || prev.customerPhone || '',
+              customerEmail: customerData.email || prev.customerEmail || '',
+              siteAddress: customerData.location || prev.siteAddress || '',
+            }))
+          }
+        }
+
         const enquiryIdToUse = enquiryIdFromQuery
         if (!enquiryIdToUse) return
 
@@ -279,7 +301,7 @@ export default function QuotationBuilder({ quotationId }){
     }
     loadData()
     return ()=>{ mounted = false }
-  }, [quotationId, enquiryIdFromQuery])
+  }, [quotationId, enquiryIdFromQuery, customerIdFromQuery])
 
   useEffect(() => {
     computeTotals()
@@ -554,6 +576,7 @@ export default function QuotationBuilder({ quotationId }){
 
     const payload = {
       ...liveData,
+      customerId: liveData.customerId || customerIdFromQuery || null,
       enquiryId: liveData.enquiryId || enquiryIdFromQuery || null,
     }
     // Log payload for debugging status-saving issues
