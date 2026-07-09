@@ -101,6 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       include: {
         customer: { select: { id: true, name: true, phone: true, email: true, location: true } },
         project: { select: { id: true, title: true, status: true, siteAddress: true, projectType: true, category: true } },
+        items: true,
       },
     })
 
@@ -388,69 +389,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     doc.y = cardsTop + cardHeight + 12
 
-    // Invoice Table
+    // Invoice Table (supports multiple items)
     ensurePageSpace(doc, 75)
     const tableTop = doc.y
-    const tableHeight = 60
     const amountColWidth = 90
+    const descColWidth = pageWidth - amountColWidth - 4
 
-    // Table border
+    const items = Array.isArray(invoice.items) ? invoice.items : []
+    const rowsCount = Math.max(1, items.length)
+    const rowHeight = 18
+    const headerHeight = 26
+    const minBodyHeight = 32
+    const bodyHeight = Math.max(minBodyHeight, rowsCount * rowHeight + 8)
+    const tableHeight = headerHeight + bodyHeight
+
+    // Table border (dynamic height)
     doc.roundedRect(left, tableTop, pageWidth, tableHeight, 6).lineWidth(1).strokeColor('#cbd5e1').stroke()
 
     // Table header background
-    doc.rect(left, tableTop, pageWidth, 26).fillColor('#f8fafc').fill()
-    doc.moveTo(left, tableTop + 26).lineTo(left + pageWidth, tableTop + 26).strokeColor('#cbd5e1').lineWidth(0.5).stroke()
+    doc.rect(left, tableTop, pageWidth, headerHeight).fillColor('#f8fafc').fill()
+    doc.moveTo(left, tableTop + headerHeight).lineTo(left + pageWidth, tableTop + headerHeight).strokeColor('#cbd5e1').lineWidth(0.5).stroke()
 
     // Table headers
-    const descColWidth = pageWidth - amountColWidth - 4
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
     doc.text('Description', left + 10, tableTop + 8, { width: descColWidth - 14, align: 'left' })
     doc.text('Amount', left + descColWidth + 8, tableTop + 8, { width: amountColWidth - 14, align: 'right' })
 
-    // Table row
+    // Table rows (items)
+    let currentY = tableTop + headerHeight + 8
     doc.font('Helvetica').fontSize(9.5).fillColor('#334155')
-    doc.text('Project / Service Charges', left + 10, tableTop + 32, { width: descColWidth - 14, align: 'left' })
-    doc.font('Helvetica').fontSize(9.5).fillColor('#0f172a')
-    const tableAmountValue = formatCurrency(invoice.subtotal)
-    doc.text(tableAmountValue, left + descColWidth + 8, tableTop + 32, { width: amountColWidth - 14, align: 'right' })
+
+    if (items.length > 0) {
+      for (const it of items) {
+        ensurePageSpace(doc, rowHeight + 40)
+        doc.text(decodeHtmlEntities(it.description || 'Item'), left + 10, currentY, { width: descColWidth - 14, align: 'left' })
+        doc.font('Helvetica').fontSize(9.5).fillColor('#0f172a')
+        doc.text(formatCurrency(it.amount), left + descColWidth + 8, currentY, { width: amountColWidth - 14, align: 'right' })
+        currentY += rowHeight
+        doc.font('Helvetica').fontSize(9.5).fillColor('#334155')
+      }
+    } else {
+      // fallback single row to preserve old layout
+      doc.text('Project / Service Charges', left + 10, currentY, { width: descColWidth - 14, align: 'left' })
+      doc.font('Helvetica').fontSize(9.5).fillColor('#0f172a')
+      doc.text(formatCurrency(invoice.subtotal), left + descColWidth + 8, currentY, { width: amountColWidth - 14, align: 'right' })
+      currentY += rowHeight
+    }
 
     doc.y = tableTop + tableHeight + 8
 
     // Summary Section
-    ensurePageSpace(doc, 75)
+    ensurePageSpace(doc, 95)
     const summaryTop = doc.y
     const summaryLabelWidth = pageWidth * 0.65
     const summaryValueWidth = pageWidth * 0.35
+    const summaryRows = [
+      { label: 'Subtotal', value: formatCurrency(invoice.subtotal ?? 0) },
+      { label: 'Discount', value: `${formatCurrency(invoice.discountAmount ?? 0)} (${Number(invoice.discountPercent ?? 0).toFixed(2)}%)` },
+      { label: 'Tax', value: `${formatCurrency(invoice.taxAmount ?? 0)} (${Number(invoice.taxPercent ?? 0).toFixed(2)}%)` },
+    ]
 
-    // Subtotal row
-    doc.font('Helvetica').fontSize(9.5).fillColor('#334155')
-    doc.text('Subtotal', left, summaryTop, { width: summaryLabelWidth, align: 'left' })
-    doc.font('Helvetica').fontSize(9.5).fillColor('#0f172a')
-    const subtotalValue = formatCurrency(invoice.subtotal)
-    doc.text(subtotalValue, left + summaryLabelWidth, summaryTop, { width: summaryValueWidth, align: 'right' })
+    summaryRows.forEach((row, index) => {
+      doc.font('Helvetica').fontSize(9.5).fillColor('#334155')
+      doc.text(row.label, left, summaryTop + index * 18, { width: summaryLabelWidth, align: 'left' })
+      doc.font('Helvetica').fontSize(9.5).fillColor('#0f172a')
+      doc.text(row.value, left + summaryLabelWidth, summaryTop + index * 18, { width: summaryValueWidth, align: 'right' })
+    })
 
-    // Tax row
-    doc.font('Helvetica').fontSize(9.5).fillColor('#334155')
-    doc.text('Tax', left, summaryTop + 18, { width: summaryLabelWidth, align: 'left' })
-    doc.font('Helvetica').fontSize(9.5).fillColor('#0f172a')
-    const taxValue = formatCurrency(invoice.taxAmount)
-    doc.text(taxValue, left + summaryLabelWidth, summaryTop + 18, { width: summaryValueWidth, align: 'right' })
+    doc.moveTo(left, summaryTop + summaryRows.length * 18 + 8).lineTo(left + pageWidth, summaryTop + summaryRows.length * 18 + 8).strokeColor('#cbd5e1').lineWidth(1).stroke()
 
-    // Divider line above Total Amount (increased spacing from Tax row)
-    doc.moveTo(left, summaryTop + 36).lineTo(left + pageWidth, summaryTop + 36).strokeColor('#cbd5e1').lineWidth(1).stroke()
+    doc.rect(left, summaryTop + summaryRows.length * 18 + 12, pageWidth, 26).fillColor('#dcfce7').fill()
+    doc.rect(left, summaryTop + summaryRows.length * 18 + 12, pageWidth, 26).lineWidth(0.5).strokeColor('#86efac').stroke()
 
-    // Total Amount highlight box with green background
-    doc.rect(left, summaryTop + 38, pageWidth, 26).fillColor('#dcfce7').fill()
-    doc.rect(left, summaryTop + 38, pageWidth, 26).lineWidth(0.5).strokeColor('#86efac').stroke()
-
-    // Total Amount label and value (consistent alignment with above rows)
     doc.font('Helvetica-Bold').fontSize(11).fillColor('#15803d')
-    doc.text('Total Amount', left, summaryTop + 42, { width: summaryLabelWidth, align: 'left' })
+    doc.text('Grand Total', left, summaryTop + summaryRows.length * 18 + 16, { width: summaryLabelWidth, align: 'left' })
     doc.font('Helvetica-Bold').fontSize(12).fillColor('#15803d')
-    const totalAmountValue = formatCurrency(invoice.totalAmount)
-    doc.text(totalAmountValue, left + summaryLabelWidth, summaryTop + 42, { width: summaryValueWidth, align: 'right' })
+    const totalAmountValue = formatCurrency(invoice.totalAmount ?? 0)
+    doc.text(totalAmountValue, left + summaryLabelWidth, summaryTop + summaryRows.length * 18 + 16, { width: summaryValueWidth, align: 'right' })
 
-    doc.y = summaryTop + 72
+    doc.y = summaryTop + summaryRows.length * 18 + 48
 
     // Notes (if present)
     if (invoice.notes) {

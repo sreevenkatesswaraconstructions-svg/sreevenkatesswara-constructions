@@ -5,6 +5,29 @@ import toast from 'react-hot-toast';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import Modal from '../../../components/admin/Modal';
 import { Trash2 } from 'lucide-react';
+import { calculateInvoiceTotals } from '../../../lib/invoiceCalculations';
+
+const createEmptyItem = () => ({ description: '', quantity: 1, unitPrice: 0, amount: 0 });
+
+const normalizeItem = (item = {}) => {
+  const quantity = Number(item.quantity ?? 1) || 0;
+  const unitPrice = Number(item.unitPrice ?? 0) || 0;
+  return {
+    id: item.id || undefined,
+    description: item.description || '',
+    quantity,
+    unitPrice,
+    amount: Number((quantity * unitPrice).toFixed(2)),
+  };
+};
+
+const normalizeItems = (items) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return [createEmptyItem()];
+  }
+
+  return items.map(normalizeItem);
+};
 
 export default function InvoiceDetailPage() {
   const router = useRouter();
@@ -14,12 +37,25 @@ export default function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     dueDate: '',
     status: 'Draft',
-    totalAmount: '',
+    subtotal: 0,
+    discountPercent: 0,
+    discountAmount: 0,
+    taxPercent: 0,
+    taxAmount: 0,
+    totalAmount: 0,
     notes: '',
+    items: [createEmptyItem()],
   });
+
+  const totals = calculateInvoiceTotals(
+    formData.items || [],
+    formData.discountPercent ?? 0,
+    formData.taxPercent ?? 0,
+  );
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -43,12 +79,21 @@ export default function InvoiceDetailPage() {
         throw new Error(data?.message || 'Failed to load invoice');
       }
 
+      const items = normalizeItems(data.items);
+      const invoiceTotals = calculateInvoiceTotals(items, data?.discountPercent ?? 0, data?.taxPercent ?? 0);
+
       setInvoice(data);
       setFormData({
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : '',
         status: data.status || 'Draft',
-        totalAmount: data.totalAmount ?? '',
+        subtotal: Number(data?.subtotal ?? invoiceTotals.subtotal).toFixed(2),
+        discountPercent: Number(data?.discountPercent ?? invoiceTotals.discountPercent),
+        discountAmount: Number(data?.discountAmount ?? invoiceTotals.discountAmount).toFixed(2),
+        taxPercent: Number(data?.taxPercent ?? invoiceTotals.taxPercent),
+        taxAmount: Number(data?.taxAmount ?? invoiceTotals.taxAmount).toFixed(2),
+        totalAmount: Number(data?.totalAmount ?? invoiceTotals.totalAmount).toFixed(2),
         notes: data.notes || '',
+        items,
       });
     } catch (error) {
       console.error('Failed to load invoice:', error);
@@ -64,6 +109,58 @@ export default function InvoiceDetailPage() {
     if (error) setError('');
   };
 
+  const handleSummaryChange = (event) => {
+    const { name, value } = event.target;
+    const numericValue = Number(value);
+
+    setFormData((prev) => {
+      const nextValue = Number.isFinite(numericValue) ? numericValue : 0;
+      const nextState = { ...prev, [name]: nextValue };
+      const totals = calculateInvoiceTotals(nextState.items || [], nextState.discountPercent ?? 0, nextState.taxPercent ?? 0);
+      return { ...nextState, ...totals };
+    });
+
+    if (error) setError('');
+  };
+
+  const updateItem = (index, key, value) => {
+    setFormData((prev) => {
+      const items = Array.isArray(prev.items) ? [...prev.items] : [];
+      const item = { ...(items[index] || createEmptyItem()) };
+
+      if (key === 'description') item.description = value;
+      if (key === 'quantity') item.quantity = Number(value);
+      if (key === 'unitPrice') item.unitPrice = Number(value);
+
+      item.amount = Number((Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2));
+      items[index] = item;
+
+      const totals = calculateInvoiceTotals(items, prev.discountPercent ?? 0, prev.taxPercent ?? 0);
+      return { ...prev, items, ...totals };
+    });
+  };
+
+  const addItem = () => {
+    setFormData((prev) => {
+      const items = [...(prev.items || []), createEmptyItem()];
+      const totals = calculateInvoiceTotals(items, prev.discountPercent ?? 0, prev.taxPercent ?? 0);
+      return { ...prev, items, ...totals };
+    });
+  };
+
+  const removeItem = (index) => {
+    setFormData((prev) => {
+      const items = [...(prev.items || [])];
+      items.splice(index, 1);
+      const totals = calculateInvoiceTotals(items, prev.discountPercent ?? 0, prev.taxPercent ?? 0);
+      return {
+        ...prev,
+        items: items.length > 0 ? items : [createEmptyItem()],
+        ...totals,
+      };
+    });
+  };
+
   const handleSave = async (event) => {
     event.preventDefault();
     if (!formData.dueDate) {
@@ -71,9 +168,8 @@ export default function InvoiceDetailPage() {
       return;
     }
 
-    const amount = Number(formData.totalAmount);
-    if (!amount || amount <= 0) {
-      setError('Total amount must be greater than zero.');
+    if (!totals.totalAmount || totals.totalAmount <= 0) {
+      setError('Invoice total must be greater than zero.');
       return;
     }
 
@@ -87,8 +183,9 @@ export default function InvoiceDetailPage() {
         body: JSON.stringify({
           dueDate: formData.dueDate,
           status: formData.status,
-          totalAmount: amount,
           notes: formData.notes,
+          items: formData.items || [],
+          ...totals,
         }),
       });
 
@@ -97,7 +194,23 @@ export default function InvoiceDetailPage() {
         throw new Error(data?.message || 'Failed to update invoice');
       }
 
+      const items = normalizeItems(data.items);
+      const invoiceTotals = calculateInvoiceTotals(items, data?.discountPercent ?? 0, data?.taxPercent ?? 0);
+
       setInvoice(data);
+      setFormData((prev) => ({
+        ...prev,
+        dueDate: data.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : prev.dueDate,
+        status: data.status || prev.status,
+        subtotal: Number(data?.subtotal ?? invoiceTotals.subtotal).toFixed(2),
+        discountPercent: Number(data?.discountPercent ?? invoiceTotals.discountPercent),
+        discountAmount: Number(data?.discountAmount ?? invoiceTotals.discountAmount).toFixed(2),
+        taxPercent: Number(data?.taxPercent ?? invoiceTotals.taxPercent),
+        taxAmount: Number(data?.taxAmount ?? invoiceTotals.taxAmount).toFixed(2),
+        totalAmount: Number(data?.totalAmount ?? invoiceTotals.totalAmount).toFixed(2),
+        notes: data.notes ?? prev.notes,
+        items,
+      }));
       toast.success('Invoice updated successfully.');
     } catch (error) {
       console.error('Failed to update invoice:', error);
@@ -107,20 +220,18 @@ export default function InvoiceDetailPage() {
     }
   };
 
-    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-    const handleDelete = async () => {
-      try {
-        const resp = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
-        const body = await resp.json();
-        if (!resp.ok) throw new Error(body?.message || 'Failed to delete invoice');
-        toast.success('Invoice deleted');
-        router.push('/admin/invoices');
-      } catch (err) {
-        console.error('Delete failed', err);
-        toast.error(err?.message || 'Failed to delete invoice');
-      }
-    };
+  const handleDelete = async () => {
+    try {
+      const resp = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+      const body = await resp.json();
+      if (!resp.ok) throw new Error(body?.message || 'Failed to delete invoice');
+      toast.success('Invoice deleted');
+      router.push('/admin/invoices');
+    } catch (err) {
+      console.error('Delete failed', err);
+      toast.error(err?.message || 'Failed to delete invoice');
+    }
+  };
 
   const formatDate = (value) => {
     if (!value) return '-';
@@ -130,6 +241,8 @@ export default function InvoiceDetailPage() {
       year: 'numeric',
     });
   };
+
+  const summaryTotals = totals;
 
   return (
     <AdminLayout>
@@ -245,19 +358,6 @@ export default function InvoiceDetailPage() {
                     <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Total Amount</label>
-                  <input
-                    type="number"
-                    name="totalAmount"
-                    value={formData.totalAmount}
-                    onChange={handleChange}
-                    min="0"
-                    step="0.01"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
               </div>
 
               <div>
@@ -269,6 +369,105 @@ export default function InvoiceDetailPage() {
                   rows="4"
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Invoice Items
+                </label>
+                <div className="space-y-2">
+                  {(formData.items || []).map((item, idx) => (
+                    <div key={`${item.id || 'new'}-${idx}`} className="grid grid-cols-12 items-center gap-2">
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(event) => updateItem(idx, 'description', event.target.value)}
+                        placeholder="Description"
+                        className="col-span-6 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        min="0"
+                        step="1"
+                        onChange={(event) => updateItem(idx, 'quantity', event.target.value)}
+                        className="col-span-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <input
+                        type="number"
+                        value={item.unitPrice}
+                        min="0"
+                        step="0.01"
+                        onChange={(event) => updateItem(idx, 'unitPrice', event.target.value)}
+                        className="col-span-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <input
+                        type="number"
+                        value={item.amount}
+                        readOnly
+                        className="col-span-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeItem(idx)}
+                        className="col-span-1 rounded-lg border border-red-300 px-2 py-1 text-sm text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="rounded-lg bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                    >
+                      + Add Item
+                    </button>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Subtotal</div>
+                        <div className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">₹{summaryTotals.subtotal.toFixed(2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">Discount %</label>
+                        <input
+                          type="number"
+                          name="discountPercent"
+                          min="0"
+                          step="0.01"
+                          value={formData.discountPercent ?? 0}
+                          onChange={handleSummaryChange}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                        />
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">₹{summaryTotals.discountAmount.toFixed(2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">Tax %</label>
+                        <input
+                          type="number"
+                          name="taxPercent"
+                          min="0"
+                          step="0.01"
+                          value={formData.taxPercent ?? 0}
+                          onChange={handleSummaryChange}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                        />
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">₹{summaryTotals.taxAmount.toFixed(2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 md:col-span-2 xl:col-span-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-emerald-700">Grand Total</span>
+                          <span className="text-xl font-bold text-emerald-700">₹{summaryTotals.totalAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">

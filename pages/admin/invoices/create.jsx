@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../../../components/admin/AdminLayout';
+import { calculateInvoiceTotals } from '../../../lib/invoiceCalculations';
 
 const generateInvoiceNumber = () => `INV-${Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`;
 
@@ -23,7 +24,15 @@ export default function CreateInvoicePage() {
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: '',
     status: 'Draft',
-    totalAmount: '',
+    items: [
+      { description: '', quantity: 1, unitPrice: 0, amount: 0 },
+    ],
+    subtotal: 0,
+    discountPercent: 0,
+    discountAmount: 0,
+    taxPercent: 0,
+    taxAmount: 0,
+    totalAmount: 0,
     notes: '',
   });
 
@@ -124,6 +133,51 @@ export default function CreateInvoicePage() {
     if (error) setError('');
   };
 
+  const handleSummaryChange = (event) => {
+    const { name, value } = event.target;
+    const numericValue = Number(value);
+
+    setFormData((prev) => {
+      const nextValue = Number.isFinite(numericValue) ? numericValue : 0;
+      const nextState = { ...prev, [name]: nextValue };
+      const totals = calculateInvoiceTotals(nextState.items || [], nextState.discountPercent ?? 0, nextState.taxPercent ?? 0);
+      return { ...nextState, ...totals };
+    });
+
+    if (error) setError('');
+  };
+
+  const updateItem = (index, key, value) => {
+    setFormData((prev) => {
+      const items = Array.isArray(prev.items) ? [...prev.items] : []
+      const item = { ...(items[index] || { description: '', quantity: 0, unitPrice: 0, amount: 0 }) }
+      if (key === 'description') item.description = value
+      if (key === 'quantity') item.quantity = Number(value)
+      if (key === 'unitPrice') item.unitPrice = Number(value)
+      item.amount = Number((Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2))
+      items[index] = item
+      const totals = calculateInvoiceTotals(items, prev.discountPercent ?? 0, prev.taxPercent ?? 0)
+      return { ...prev, items, ...totals }
+    })
+  }
+
+  const addItem = () => {
+    setFormData((prev) => {
+      const items = [...(prev.items || []), { description: '', quantity: 1, unitPrice: 0, amount: 0 }]
+      const totals = calculateInvoiceTotals(items, prev.discountPercent ?? 0, prev.taxPercent ?? 0)
+      return { ...prev, items, ...totals }
+    })
+  }
+
+  const removeItem = (index) => {
+    setFormData((prev) => {
+      const items = [...(prev.items || [])]
+      items.splice(index, 1)
+      const totals = calculateInvoiceTotals(items, prev.discountPercent ?? 0, prev.taxPercent ?? 0)
+      return { ...prev, items, ...totals }
+    })
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -137,9 +191,9 @@ export default function CreateInvoicePage() {
       return;
     }
 
-    const amount = Number(formData.totalAmount);
-    if (!amount || amount <= 0) {
-      setError('Total amount must be greater than zero.');
+    const totals = calculateInvoiceTotals(formData.items || [], formData.discountPercent ?? 0, formData.taxPercent ?? 0)
+    if (!totals.totalAmount || totals.totalAmount <= 0) {
+      setError('Grand total must be greater than zero.');
       return;
     }
 
@@ -153,10 +207,9 @@ export default function CreateInvoicePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          totalAmount: amount,
+          items: formData.items || [],
+          ...totals,
           customerName: selectedCustomer?.name || '',
-          subtotal: amount,
-          taxAmount: 0,
         }),
       });
 
@@ -175,6 +228,8 @@ export default function CreateInvoicePage() {
       setSubmitting(false);
     }
   };
+
+  const summaryTotals = calculateInvoiceTotals(formData.items || [], formData.discountPercent ?? 0, formData.taxPercent ?? 0);
 
   return (
     <AdminLayout>
@@ -296,21 +351,103 @@ export default function CreateInvoicePage() {
                 </select>
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Total Amount <span className="text-red-500">*</span>
+                  Invoice Items
                 </label>
-                <input
-                  type="number"
-                  name="totalAmount"
-                  value={formData.totalAmount}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  required
-                  placeholder="0.00"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
-                />
+                <div className="space-y-2">
+                  {(formData.items || []).map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                        placeholder="Description"
+                        className="col-span-6 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        min="0"
+                        step="1"
+                        onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                        className="col-span-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <input
+                        type="number"
+                        value={item.unitPrice}
+                        min="0"
+                        step="0.01"
+                        onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
+                        className="col-span-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <input
+                        type="number"
+                        value={item.amount}
+                        readOnly
+                        className="col-span-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeItem(idx)}
+                        className="col-span-1 rounded-lg border border-red-300 px-2 py-1 text-sm text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="rounded-lg bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                    >
+                      + Add Item
+                    </button>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Subtotal</div>
+                        <div className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">₹{summaryTotals.subtotal.toFixed(2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">Discount %</label>
+                        <input
+                          type="number"
+                          name="discountPercent"
+                          min="0"
+                          step="0.01"
+                          value={formData.discountPercent ?? 0}
+                          onChange={handleSummaryChange}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                        />
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">₹{summaryTotals.discountAmount.toFixed(2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">Tax %</label>
+                        <input
+                          type="number"
+                          name="taxPercent"
+                          min="0"
+                          step="0.01"
+                          value={formData.taxPercent ?? 0}
+                          onChange={handleSummaryChange}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                        />
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">₹{summaryTotals.taxAmount.toFixed(2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 md:col-span-2 xl:col-span-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-emerald-700">Grand Total</span>
+                          <span className="text-xl font-bold text-emerald-700">₹{summaryTotals.totalAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

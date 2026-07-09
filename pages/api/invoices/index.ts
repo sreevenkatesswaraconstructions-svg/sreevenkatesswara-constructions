@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
+import { calculateInvoiceTotals } from '../../../lib/invoiceCalculations';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -50,26 +51,91 @@ async function handleCreateInvoice(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ success: false, message: 'Invalid due date' });
     }
 
-    const subtotal = Number(body.subtotal ?? 0);
-    const taxAmount = Number(body.taxAmount ?? 0);
-    const totalAmount = Number(body.totalAmount ?? 0);
+    const parsedDiscountPercent = Number(body.discountPercent ?? 0);
+    const parsedTaxPercent = Number(body.taxPercent ?? 0);
 
-    if (Number.isNaN(totalAmount) || totalAmount <= 0) {
+    // If items are provided, compute amounts from items and persist them together
+    const items = Array.isArray(body.items) ? body.items : [];
+    if (items.length > 0) {
+      // normalize and compute amount for each item
+      const normalizedItems = items.map((it: any) => {
+        const quantity = Number(it.quantity ?? 0) || 0
+        const unitPrice = Number(it.unitPrice ?? 0) || 0
+        const amount = Number(it.amount ?? quantity * unitPrice) || quantity * unitPrice
+        return {
+          description: it.description ? String(it.description) : '',
+          quantity,
+          unitPrice,
+          amount,
+        }
+      })
+
+      const totals = calculateInvoiceTotals(normalizedItems, parsedDiscountPercent, parsedTaxPercent)
+
+      // Create invoice with nested items using Prisma's nested create
+      const invoiceCreateData: any = {
+        invoiceNumber,
+        customerName: body.customerName ? String(body.customerName) : null,
+        status: body.status ? String(body.status) : 'Draft',
+        issueDate,
+        dueDate: dueDate || undefined,
+        subtotal: totals.subtotal,
+        discountPercent: totals.discountPercent,
+        discountAmount: totals.discountAmount,
+        taxPercent: totals.taxPercent,
+        taxAmount: totals.taxAmount,
+        totalAmount: totals.totalAmount,
+        notes: body.notes ? String(body.notes) : null,
+        items: {
+          create: normalizedItems,
+        },
+      }
+
+      if (body.customerId) {
+        invoiceCreateData.customer = { connect: { id: String(body.customerId) } }
+      }
+
+      if (body.projectId) {
+        invoiceCreateData.project = { connect: { id: String(body.projectId) } }
+      }
+
+      const invoice = await prisma.invoice.create({
+        data: invoiceCreateData,
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          project: { select: { id: true, title: true } },
+          items: { orderBy: { createdAt: 'asc' } },
+        },
+      })
+
+      return res.status(201).json(invoice)
+    }
+
+    // Fallback to existing behavior when no items are provided
+    const totals = calculateInvoiceTotals([], parsedDiscountPercent, parsedTaxPercent)
+    if (Number.isNaN(totals.totalAmount) || totals.totalAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Total amount must be a number greater than zero' });
     }
 
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
-        customerId: body.customerId ? String(body.customerId) : null,
+        customer: body.customerId
+          ? { connect: { id: String(body.customerId) } }
+          : undefined,
         customerName: body.customerName ? String(body.customerName) : null,
-        projectId: body.projectId ? String(body.projectId) : null,
+        project: body.projectId
+          ? { connect: { id: String(body.projectId) } }
+          : undefined,
         status: body.status ? String(body.status) : 'Draft',
         issueDate,
         dueDate: dueDate || undefined,
-        subtotal,
-        taxAmount,
-        totalAmount,
+        subtotal: totals.subtotal,
+        discountPercent: totals.discountPercent,
+        discountAmount: totals.discountAmount,
+        taxPercent: totals.taxPercent,
+        taxAmount: totals.taxAmount,
+        totalAmount: totals.totalAmount,
         notes: body.notes ? String(body.notes) : null,
       },
       include: {

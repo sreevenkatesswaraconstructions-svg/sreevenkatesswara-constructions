@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
+import { calculateInvoiceTotals } from '../../../lib/invoiceCalculations';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -48,6 +49,9 @@ async function handleGetInvoice(id: string, res: NextApiResponse) {
         project: {
           select: { id: true, title: true },
         },
+        items: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
@@ -66,32 +70,92 @@ async function handleUpdateInvoice(id: string, req: NextApiRequest, res: NextApi
   try {
     const body = req.body || {};
     const dueDate = body.dueDate ? new Date(body.dueDate) : null;
-    const totalAmount = Number(body.totalAmount);
     const status = body.status ? String(body.status) : 'Draft';
     const notes = body.notes != null ? String(body.notes) : null;
+    const discountPercent = Number(body.discountPercent ?? 0) || 0;
+    const taxPercent = Number(body.taxPercent ?? 0) || 0;
 
     if (!body.dueDate || !dueDate || Number.isNaN(dueDate.getTime())) {
       return res.status(400).json({ success: false, message: 'Invalid due date' });
     }
 
-    if (Number.isNaN(totalAmount) || totalAmount <= 0) {
+    const incomingItems = Array.isArray(body.items) ? body.items : [];
+    const normalizedItems = incomingItems.map((item: any) => {
+      const quantity = Number(item.quantity ?? 0) || 0;
+      const unitPrice = Number(item.unitPrice ?? 0) || 0;
+      const amount = Number((quantity * unitPrice).toFixed(2));
+      return {
+        id: item.id ? String(item.id) : undefined,
+        description: item.description ? String(item.description) : '',
+        quantity,
+        unitPrice,
+        amount,
+      };
+    });
+
+    const totals = calculateInvoiceTotals(normalizedItems, discountPercent, taxPercent);
+
+    if (Number.isNaN(totals.totalAmount) || totals.totalAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Total amount must be greater than zero' });
     }
 
-    const invoice = await prisma.invoice.update({
+    const invoiceItemModel = (prisma as any).invoiceItem;
+    const updatedInvoice = await prisma.invoice.update({
       where: { id },
       data: {
         dueDate,
         status,
-        totalAmount,
+        subtotal: totals.subtotal,
+        discountPercent: totals.discountPercent,
+        discountAmount: totals.discountAmount,
+        taxPercent: totals.taxPercent,
+        taxAmount: totals.taxAmount,
+        totalAmount: totals.totalAmount,
         notes,
       },
+    });
+
+    if (invoiceItemModel) {
+      try {
+        await invoiceItemModel.deleteMany({ where: { invoiceId: id } });
+      } catch (error) {
+        console.warn('[INVOICE UPDATE] deleting old items failed', error);
+      }
+
+      if (normalizedItems.length > 0) {
+        const itemsToCreate = normalizedItems.map((item: any) => ({
+          invoiceId: updatedInvoice.id,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: item.amount,
+        }));
+
+        try {
+          if (invoiceItemModel.createMany) {
+            await invoiceItemModel.createMany({ data: itemsToCreate });
+          } else {
+            for (const item of itemsToCreate) {
+              await invoiceItemModel.create({ data: item });
+            }
+          }
+        } catch (error) {
+          console.warn('[INVOICE UPDATE] creating items failed', error);
+        }
+      }
+    }
+
+    let invoice: any = await prisma.invoice.findUnique({
+      where: { id: updatedInvoice.id },
       include: {
         customer: {
           select: { id: true, name: true, phone: true },
         },
         project: {
           select: { id: true, title: true },
+        },
+        items: {
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
