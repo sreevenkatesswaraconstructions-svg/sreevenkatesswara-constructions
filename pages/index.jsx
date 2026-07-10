@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react'
 import SEO from '../components/SEO'
 import Hero from '../components/Hero'
 import ServiceCard from '../components/ServiceCard'
-import ProjectCard from '../components/ProjectCard'
 import TestimonialCard from '../components/TestimonialCard'
 import ClickableImage from '../components/ClickableImage'
-import projects from '../data/projects'
 import Link from 'next/link'
 
 const services = [
@@ -147,19 +145,6 @@ export default function Home(){
                 rounded="rounded-[1.75rem]"
               />
             </div>
-          </div>
-        </section>
-
-        <section>
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8">
-            <div>
-              <p className="text-sm uppercase tracking-[0.35em] text-gold">Featured Projects</p>
-              <h2 className="text-4xl font-serif text-emerald">A portfolio of residential, interiors, commercial and villa excellence.</h2>
-            </div>
-            <Link href="/projects" className="inline-flex items-center justify-center rounded-full border border-emerald px-5 py-3 text-sm text-emerald hover:bg-emerald/5">View project gallery</Link>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {projects.slice(0, 3).map(project => <ProjectCard key={project.id} project={project} />)}
           </div>
         </section>
 
