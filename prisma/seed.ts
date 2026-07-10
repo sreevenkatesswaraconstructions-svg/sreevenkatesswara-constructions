@@ -4,7 +4,6 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('Starting database seed...')
 
   // Create default admin user
   const hashedPassword = await bcrypt.hash('admin123', 10)
@@ -21,7 +20,6 @@ async function main() {
       emailVerified: true
     }
   })
-  console.log('Created admin user:', admin.email)
 
   // Create services
   const services = [
@@ -89,7 +87,6 @@ async function main() {
       update: {},
       create: service
     })
-    console.log('Created service:', service.serviceName)
   }
 
   // Create sample projects
@@ -136,7 +133,6 @@ async function main() {
     await prisma.project.create({
       data: project
     })
-    console.log('Created project:', project.title)
   }
 
   // Create sample blogs
@@ -169,7 +165,6 @@ async function main() {
     await prisma.blog.create({
       data: blog
     })
-    console.log('Created blog:', blog.title)
   }
 
   // Create sample settings
@@ -187,10 +182,8 @@ async function main() {
       update: { value: setting.value },
       create: setting
     })
-    console.log('Created setting:', setting.key)
   }
 
-  console.log('Database seed completed successfully!')
 }
 
 main()

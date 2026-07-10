@@ -56,7 +56,6 @@ function ensurePageSpace(doc: any, space: number) {
 }
 
 async function loadLogoBuffer(logoUrl: string): Promise<Buffer | null> {
-  console.log('[Quotation PDF] Company Logo URL:', logoUrl || '(none)')
   if (!logoUrl) return null
 
   if (logoUrl.startsWith('data:')) {
@@ -65,7 +64,6 @@ async function loadLogoBuffer(logoUrl: string): Promise<Buffer | null> {
       throw new Error('Invalid data URL for logo image')
     }
     const buffer = Buffer.from(matches[2], 'base64')
-    console.log('[Quotation PDF] logoBuffer status: data URL decoded', buffer.length)
     return buffer
   }
 
@@ -75,19 +73,16 @@ async function loadLogoBuffer(logoUrl: string): Promise<Buffer | null> {
       throw new Error(`Logo file not found at ${localPath}`)
     }
     const buffer = fs.readFileSync(localPath)
-    console.log('[Quotation PDF] logoBuffer status: local file loaded', buffer.length)
     return buffer
   }
 
   if (/^https?:\/\//i.test(logoUrl)) {
-    console.log('[Quotation PDF] Fetching logo from remote URL')
     try {
       const response = await fetch(logoUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0',
         },
       })
-      console.log('[Quotation PDF] Remote logo fetch status:', response.status, response.statusText)
       if (!response.ok) {
         throw new Error(`Logo download failed with status ${response.status} ${response.statusText}`)
       }
@@ -96,7 +91,6 @@ async function loadLogoBuffer(logoUrl: string): Promise<Buffer | null> {
         throw new Error(`Unexpected logo content type: ${contentType}`)
       }
       const buffer = Buffer.from(await response.arrayBuffer())
-      console.log('[Quotation PDF] logoBuffer status: remote image loaded', buffer.length)
       return buffer
     } catch (error) {
       console.error('[Quotation PDF] Error downloading logo image:', error)
@@ -107,7 +101,6 @@ async function loadLogoBuffer(logoUrl: string): Promise<Buffer | null> {
   const localPath = path.join(process.cwd(), 'public', logoUrl)
   if (fs.existsSync(localPath)) {
     const buffer = fs.readFileSync(localPath)
-    console.log('[Quotation PDF] logoBuffer status: fallback local file loaded', buffer.length)
     return buffer
   }
 
@@ -165,7 +158,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (logoUrl) {
       try {
         logoBuffer = await loadLogoBuffer(logoUrl)
-        console.log('[Quotation PDF] logoBuffer status:', logoBuffer ? 'ready' : 'empty')
       } catch (error) {
         console.error('[Quotation PDF] Image loading failed:', error)
         throw error
@@ -183,13 +175,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             align: 'left',
             quality: 100,
           })
-          console.log('[Quotation PDF] Image loading success')
         } catch (error) {
           console.error('[Quotation PDF] Image loading error:', error)
           throw error
         }
       } else if (!logoBuffer) {
-        console.log('[Quotation PDF] Skipping logo render because logoBuffer is empty')
       }
 
       const companyX = logoBuffer ? left + 120 : left

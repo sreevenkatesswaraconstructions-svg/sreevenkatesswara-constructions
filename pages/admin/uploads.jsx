@@ -44,7 +44,6 @@ export default function UploadsPage() {
     const response = await fetch('/api/upload/files');
     const data = await response.json();
 
-    console.log("UPLOAD API RESPONSE:", data);
 
       if (data.success) {
       setUploads(data.files);

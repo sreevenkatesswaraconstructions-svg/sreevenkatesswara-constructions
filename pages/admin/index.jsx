@@ -12,8 +12,6 @@ export default function AdminDashboard({ stats, activities }) {
 
 export async function getServerSideProps() {
   try {
-    console.log('[DASHBOARD] Fetching real-time database counts...');
-    console.log('[DASHBOARD] Fetching recent activities...');
 
     const completedStatus = 'Completed';
 
@@ -56,12 +54,6 @@ export async function getServerSideProps() {
     const serviceCount = serviceCountResult.status === 'fulfilled' ? serviceCountResult.value : 0;
 
     // Log the counts
-    console.log('[DASHBOARD] Enquiries:', enquiryCount);
-    console.log('[DASHBOARD] Projects:', projectCount);
-    console.log('[DASHBOARD] Active Projects:', activeProjectCount);
-    console.log('[DASHBOARD] Completed Projects:', completedProjectCount);
-    console.log('[DASHBOARD] Blogs:', blogCount);
-    console.log('[DASHBOARD] Services:', serviceCount);
 
     // Fetch recent activities from database
     const [enquiries, projects, blogs, services] = await Promise.all([
@@ -145,7 +137,6 @@ export async function getServerSideProps() {
     activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const latestActivities = activities.slice(0, 10);
 
-    console.log('[DASHBOARD] Activities count:', latestActivities.length);
 
     const stats = [
       {

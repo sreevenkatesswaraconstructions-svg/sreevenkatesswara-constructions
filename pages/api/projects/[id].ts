@@ -11,7 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'GET') {
     try {
-      console.log('[PROJECT API] Fetching project:', id);
       const project = await prisma.project.findUnique({
         where: { id }
       })
@@ -21,7 +20,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'Project not found' })
       }
 
-      console.log('[PROJECT API] Project fetched:', id);
       return res.status(200).json(project)
     } catch (error) {
       console.error('[PROJECT API] Error fetching project:', error);
@@ -31,7 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'PUT') {
     try {
-      console.log('[PROJECT API] Updating project:', id);
       const {
         title,
         description,
@@ -85,7 +82,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
 
       if (shouldSendTestimonialRequest) {
-        console.log('[TESTIMONIAL] Project completed')
         try {
           const enrichedProject = await prisma.project.findUnique({
             where: { id },
@@ -103,10 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const customerEmail = enrichedProject?.customer?.email?.trim()
 
           if (!customerEmail) {
-            console.log('[TESTIMONIAL] Customer email missing.')
           } else {
-            console.log('[TESTIMONIAL] Sending testimonial email...')
-            console.log('[TESTIMONIAL] Customer:', customerEmail)
 
             try {
               const existingRequestLog = await prisma.emailLog.findFirst({
@@ -126,13 +119,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   projectId: id,
                 })
 
-                console.log('[PROJECT API] Testimonial request email result:', result)
 
                 if (!result?.success) {
                   console.error('[TESTIMONIAL] Resend error:', result?.error || 'Unknown error')
                 }
               } else {
-                console.log('[PROJECT API] Skipping duplicate testimonial request email for project:', id)
               }
             } catch (sendErr) {
               console.error('[TESTIMONIAL] Error sending testimonial email:', sendErr)
@@ -144,7 +135,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      console.log('[PROJECT API] Project updated:', id);
       return res.status(200).json(project)
     } catch (error) {
       console.error('[PROJECT API] Error updating project:', error);
@@ -154,12 +144,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'DELETE') {
     try {
-      console.log('[PROJECT API] Deleting project:', id);
       await prisma.project.delete({
         where: { id }
       })
 
-      console.log('[PROJECT API] Project deleted:', id);
       return res.status(204).end()
     } catch (error) {
       console.error('[PROJECT API] Error deleting project:', error);

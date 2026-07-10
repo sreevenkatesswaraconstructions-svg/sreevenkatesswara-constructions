@@ -77,8 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     //await fs.copyFile(file.filepath, filePath)
 
     //const exists = await fs.stat(filePath)
-    //console.log("FILE SAVED:", filePath)
-    //console.log("FILE SIZE:", exists.size)
     //await fs.unlink(file.filepath)
 
     // Generate file URL
@@ -101,7 +99,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const fileUrl = uploadResult.secure_url
 
-    console.log("Cloudinary URL:", fileUrl)
     // Save to database
     const media = await prisma.media.create({
       data: {

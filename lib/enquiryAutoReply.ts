@@ -3,18 +3,12 @@ import { prisma } from './prisma';
 import { company } from './company';
 
 // Initialize Resend with API key or fallback
-console.log('[AUTO-REPLY INIT] Checking Resend configuration...');
-console.log('[AUTO-REPLY INIT] RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-console.log('[AUTO-REPLY INIT] RESEND_API_KEY length:', process.env.RESEND_API_KEY?.length || 0);
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
-console.log('[AUTO-REPLY INIT] Resend client initialized:', !!resend);
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 const COMPANY_NAME = company.name;
-console.log('[AUTO-REPLY INIT] FROM_EMAIL:', FROM_EMAIL);
-console.log('[AUTO-REPLY INIT] Configuration check complete');
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -47,9 +41,7 @@ async function logEmailToDatabase(data: {
           metadata: data.metadata ? JSON.stringify(data.metadata) : null,
         },
       });
-      console.log('[AUTO-REPLY] Successfully logged to database');
     } else {
-      console.log('[AUTO-REPLY] EmailLog model not available yet, skipping database log');
     }
   } catch (dbError) {
     console.error('[AUTO-REPLY] Failed to log to database:', dbError);
@@ -72,10 +64,6 @@ async function sendEmailWithRetry(
   const toEmail = params.to;
   const emailType = params.emailType || 'customer_acknowledgement';
 
-  console.log('[AUTO-REPLY] sendEmailWithRetry called');
-  console.log('[AUTO-REPLY] To:', toEmail);
-  console.log('[AUTO-REPLY] Subject:', params.subject);
-  console.log('[AUTO-REPLY] Retry count:', retryCount);
 
   if (!resend) {
     const error = new Error('Resend API key not configured. Please add RESEND_API_KEY to your .env file.');
@@ -103,16 +91,7 @@ async function sendEmailWithRetry(
       html: params.html,
     };
 
-    console.log('[AUTO-REPLY] Email params:', {
-      from: emailParams.from,
-      to: emailParams.to,
-      subject: emailParams.subject,
-      htmlLength: emailParams.html.length
-    });
-
-    console.log('[AUTO-REPLY] Calling resend.emails.send()...');
     const result = await resend.emails.send(emailParams);
-    console.log('[AUTO-REPLY] Resend API response:', result);
 
     // Check if Resend returned an error in the response
     if (result.error) {
@@ -134,8 +113,6 @@ async function sendEmailWithRetry(
       return { success: false, error: result.error };
     }
 
-    console.log('[AUTO-REPLY] ✅ Email sent successfully');
-    console.log('[AUTO-REPLY] ✅ Resend data:', result.data);
 
     await logEmailToDatabase({
       toEmail,
@@ -155,7 +132,6 @@ async function sendEmailWithRetry(
     console.error('[AUTO-REPLY] ❌ Error statusCode:', error?.statusCode);
 
     if (retryCount < MAX_RETRIES) {
-      console.log(`[AUTO-REPLY] Retrying email send (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
       await delay(RETRY_DELAY * (retryCount + 1));
       return sendEmailWithRetry(params, retryCount + 1);
     }
@@ -453,25 +429,14 @@ export async function sendEnquiryAcknowledgement(enquiry: {
   location?: string | null;
   message?: string | null;
 }): Promise<{ success: boolean; error?: any }> {
-  console.log('[AUTO-REPLY] ==================================');
-  console.log('[AUTO-REPLY] Customer:', enquiry.email);
-  console.log('[AUTO-REPLY] Service:', enquiry.service);
-  console.log('[AUTO-REPLY] Enquiry ID:', enquiry.id);
-  console.log('[AUTO-REPLY] Sending acknowledgement email...');
 
   try {
-    console.log('[AUTO-REPLY] Generating email content...');
     const { subject } = generateEnquiryReply(enquiry);
     const html = generateHTMLEmail({
       ...enquiry,
       enquiryId: enquiry.id,
     });
-    console.log('[AUTO-REPLY] Email content generated');
-    console.log('[AUTO-REPLY] Subject:', subject);
-    console.log('[AUTO-REPLY] HTML length:', html.length);
 
-    console.log('[AUTO-REPLY] Sending email to:', enquiry.email);
-    console.log('[AUTO-REPLY] Calling sendEmailWithRetry...');
     const result = await sendEmailWithRetry({
       to: enquiry.email,
       subject,
@@ -485,22 +450,17 @@ export async function sendEnquiryAcknowledgement(enquiry: {
       },
     });
 
-    console.log('[AUTO-REPLY] Resend response:', result);
 
     if (result.success) {
-      console.log('[AUTO-REPLY] ✅ Email sent successfully');
-      console.log('[AUTO-REPLY] ==================================');
       return { success: true };
     } else {
       console.error('[AUTO-REPLY] ❌ Delivery failed:', result.error);
-      console.log('[AUTO-REPLY] ==================================');
       return { success: false, error: result.error };
     }
   } catch (error: any) {
     console.error('[AUTO-REPLY] ❌ Delivery failed with exception:', error);
     console.error('[AUTO-REPLY] ❌ Error message:', error?.message);
     console.error('[AUTO-REPLY] ❌ Error stack:', error?.stack);
-    console.log('[AUTO-REPLY] ==================================');
     return { success: false, error };
   }
 }

@@ -29,7 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       await fs.unlink(filePath)
     } catch (error) {
-      console.warn('File not found or already deleted:', filePath)
     }
 
     // Delete database record

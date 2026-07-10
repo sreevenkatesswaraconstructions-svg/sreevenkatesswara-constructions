@@ -153,7 +153,7 @@ export default function Home(){
                 <p className="mt-2 text-sm text-gray-600">Approved featured reviews from our clients will appear here.</p>
                 <div className="mt-6 flex flex-col items-center gap-3">
                   <p className="text-base font-semibold text-emerald">Have you worked with us?</p>
-                  <p className="text-sm text-gray-600">We'd love to hear about your experience.</p>
+                  <p className="text-sm text-gray-600">We&apos;d love to hear about your experience.</p>
                   <Link href="/share-your-experience" className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-white font-semibold">⭐ Share Your Experience</Link>
                 </div>
               </div>

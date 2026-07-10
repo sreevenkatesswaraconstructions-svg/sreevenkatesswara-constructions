@@ -7,7 +7,6 @@ import type { NextApiRequest, NextApiResponse } from 'next'
  * Usage: GET /api/debug-email-config
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log('[DEBUG] === EMAIL CONFIGURATION DEBUG ===')
   
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -23,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     nodeEnv: process.env.NODE_ENV || 'development'
   }
 
-  console.log('[DEBUG] Configuration:', JSON.stringify(config, null, 2))
 
   const issues: string[] = []
   if (!config.resendApiKeyExists) {
@@ -48,8 +46,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]
   }
 
-  console.log('[DEBUG] Diagnostics:', JSON.stringify(diagnostics, null, 2))
-  console.log('[DEBUG] =================================')
 
   res.status(200).json(diagnostics)
 }

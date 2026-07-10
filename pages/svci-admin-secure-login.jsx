@@ -125,7 +125,7 @@ export default function AdminSecureLogin() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 onClick={() => router.push('/svci-admin-register')}
                 className="text-emerald-600 hover:text-emerald-700 font-medium"

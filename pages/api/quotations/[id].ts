@@ -25,7 +25,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'PUT') {
     try {
-      console.log('PUT /api/quotations/:id received', { id, body: req.body })
       const existing = await prisma.quotation.findUnique({ where: { id } })
       if (!existing) return res.status(404).json(response(false, null, 'Not found'))
 
@@ -33,15 +32,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!body.status) body.status = 'Saved'
       const validation = validateQuotationPayload(body, { allowIncompleteDraft: ['DRAFT', 'SAVED'].includes(String(body.status ?? '').trim().toUpperCase()) })
       if (!validation.isValid) {
-        console.log('PUT /api/quotations/:id validation failed', validation.errors)
         return res.status(400).json(response(false, null, validation.errors.join(', ')))
       }
 
       const quotationNumber = String(existing.quotationNumber || '').trim() || (await generateQuotationNumber())
       const payload = await serializeQuotationPayload(body, { quotationNumber })
-      console.log('PUT /api/quotations/:id prisma update payload', payload)
       const updated = await prisma.quotation.update({ where: { id }, data: payload })
-      console.log('PUT /api/quotations/:id prisma update result', updated)
       const normalized = normalizeQuotationRecord({
         ...(updated as Record<string, any>),
         discountPercent: body?.discountPercent ?? (updated as any).discountPercent,
@@ -51,7 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         subtotalAfterDiscount: body?.subtotalAfterDiscount ?? (updated as any).subtotalAfterDiscount,
         grandTotal: body?.grandTotal ?? (updated as any).grandTotal,
       })
-      console.log('PUT /api/quotations/:id returning', normalized)
       return res.status(200).json(response(true, normalized, 'Quotation updated'))
     } catch (err: any) {
       console.error('PUT /api/quotations/:id', err)

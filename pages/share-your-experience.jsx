@@ -98,7 +98,7 @@ export default function ShareYourExperience(){
           <h1 className="text-4xl font-serif text-emerald">Share Your Experience</h1>
           <div className="prose max-w-none text-gray-700">
             <p>We truly value your feedback.</p>
-            <p>If we had the opportunity to work with you, we'd love to hear about your experience.</p>
+            <p>If we had the opportunity to work with you, we&apos;d love to hear about your experience.</p>
             <p>Your review helps us improve our services and helps future customers make informed decisions.</p>
           </div>
         </div>

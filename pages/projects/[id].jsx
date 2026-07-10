@@ -74,7 +74,6 @@ export default function ProjectDetail({ project }) {
 export async function getServerSideProps(context) {
   try {
     const { id } = context.params;
-    console.log('[PUBLIC PROJECT DETAIL] Fetching project:', id);
     
     const project = await prisma.project.findUnique({
       where: { id }
@@ -85,7 +84,6 @@ export async function getServerSideProps(context) {
       return { props: { project: null } };
     }
 
-    console.log('[PUBLIC PROJECT DETAIL] Project fetched:', id);
     return {
       props: {
         project: JSON.parse(JSON.stringify(project)),

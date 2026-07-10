@@ -45,7 +45,6 @@ const logWhatsAppAttempt = (type: string, to: string, success: boolean, error?: 
     error: error?.message || null,
   };
   
-  console.log(`[WhatsApp Log] ${JSON.stringify(logEntry)}`);
   
   // In production, you might want to save this to a database
   return logEntry;
@@ -117,7 +116,6 @@ async function sendWhatsAppMessage(
 
     // Retry on failure
     if (retryCount < MAX_RETRIES) {
-      console.log(`Retrying WhatsApp message (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
       await delay(RETRY_DELAY * (retryCount + 1));
       return sendWhatsAppMessage(message, retryCount + 1);
     }

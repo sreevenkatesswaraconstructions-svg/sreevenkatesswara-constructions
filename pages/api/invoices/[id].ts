@@ -119,7 +119,6 @@ async function handleUpdateInvoice(id: string, req: NextApiRequest, res: NextApi
       try {
         await invoiceItemModel.deleteMany({ where: { invoiceId: id } });
       } catch (error) {
-        console.warn('[INVOICE UPDATE] deleting old items failed', error);
       }
 
       if (normalizedItems.length > 0) {
@@ -140,7 +139,6 @@ async function handleUpdateInvoice(id: string, req: NextApiRequest, res: NextApi
             }
           }
         } catch (error) {
-          console.warn('[INVOICE UPDATE] creating items failed', error);
         }
       }
     }

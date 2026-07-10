@@ -105,9 +105,7 @@ const getLogoValue = (settings: Record<string, any> = {}) => {
 
 const getPreviewLogoUrl = (settings: Record<string, any> = {}, baseUrl = '') => {
   const resolvedUrl = resolveUrl(getLogoValue(settings), baseUrl || '')
-  console.log('[Quotation Preview] Company Logo URL:', resolvedUrl || '(none)')
   if (resolvedUrl && /cloudinary/i.test(resolvedUrl)) {
-    console.log('[Quotation Preview] Cloudinary URL detected for logo')
   }
   return resolvedUrl
 }

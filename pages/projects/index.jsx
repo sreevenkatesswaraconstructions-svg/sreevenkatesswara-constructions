@@ -36,11 +36,9 @@ export default function Projects({ projects }) {
 
 export async function getServerSideProps() {
   try {
-    console.log('[PUBLIC PROJECTS] Fetching projects from database...');
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    console.log('[PUBLIC PROJECTS] Fetched', projects.length, 'projects');
     return {
       props: {
         projects: JSON.parse(JSON.stringify(projects)),

@@ -16,63 +16,43 @@ import { sendOTPEmail } from '../../../../lib/email'
  */
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log('[ADMIN REGISTER] === RESEND OTP API CALLED ===')
-  console.log('[ADMIN REGISTER] Timestamp:', new Date().toISOString())
-  console.log('[ADMIN REGISTER] Method:', req.method)
-  console.log('[ADMIN REGISTER] Body:', JSON.stringify(req.body))
 
   if (req.method !== 'POST') {
-    console.log('[ADMIN REGISTER] Method not allowed')
     return res.status(405).json({ success: false, error: 'Method not allowed' })
   }
 
   try {
     const { email, name } = req.body
 
-    console.log('[ADMIN REGISTER] Email:', email)
-    console.log('[ADMIN REGISTER] Name:', name)
 
     if (!email || !name) {
-      console.log('[ADMIN REGISTER] Missing email or name')
       return res.status(400).json({ success: false, error: 'Email and name are required' })
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      console.log('[ADMIN REGISTER] Invalid email format')
       return res.status(400).json({ success: false, error: 'Invalid email format' })
     }
 
     // Ensure we're not sending to admin email by mistake
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@sreevenkatesswaraconstructions.com'
     if (email === adminEmail) {
-      console.log('[ADMIN REGISTER] Warning: Attempting to resend OTP to admin email')
       // This is allowed but logged for security
     }
 
     // Generate new OTP
-    console.log('[ADMIN REGISTER] Generating new OTP...')
     const otp = generateOTP()
-    console.log('[ADMIN REGISTER] Generated OTP:', otp)
     
     // Store OTP with 10 minute expiry
-    console.log('[ADMIN REGISTER] Storing OTP...')
     storeOTP(email, otp, 10)
-    console.log('[ADMIN REGISTER] OTP stored successfully')
 
     // Log OTP to console for development
-    console.log('[ADMIN REGISTER] =================================')
-    console.log('[ADMIN REGISTER] RESEND OTP for', email)
-    console.log('[ADMIN REGISTER] OTP:', otp)
-    console.log('[ADMIN REGISTER] =================================')
 
     // Try to send OTP via email
-    console.log('[ADMIN REGISTER] === EMAIL SENDING ===')
     let emailSent = false
     let emailError = null
     try {
-      console.log('[ADMIN REGISTER] Resending OTP to:', email)
       
       const emailResult = await sendOTPEmail({
         to: email,
@@ -81,11 +61,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         expiryMinutes: 10
       })
       
-      console.log('[ADMIN REGISTER] Email API Response:', JSON.stringify(emailResult))
       
       if (emailResult.success) {
         emailSent = true
-        console.log('[ADMIN REGISTER] ✅ OTP resent successfully to:', email)
       } else {
         emailError = emailResult.error
         console.error('[ADMIN REGISTER] ❌ OTP resend failed:', JSON.stringify(emailResult.error))
@@ -96,7 +74,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('[ADMIN REGISTER] Error stack:', error?.stack || 'No stack available')
       // Continue even if email fails - OTP is stored and logged to console
     }
-    console.log('[ADMIN REGISTER] =================================')
 
     res.status(200).json({
       success: true,

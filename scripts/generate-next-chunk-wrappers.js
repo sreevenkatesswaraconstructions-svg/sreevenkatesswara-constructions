@@ -20,10 +20,8 @@ files.forEach(f=>{
   const content = `module.exports = require('${targetRel}')\n`
   try{
     fs.writeFileSync(wrapperPath, content, { encoding: 'utf8' })
-    console.log('Wrote wrapper:', wrapperPath)
   }catch(err){
     console.error('Failed to write', wrapperPath, err.message)
   }
 })
 
-console.log('Done generating wrappers for', files.length, 'chunks')

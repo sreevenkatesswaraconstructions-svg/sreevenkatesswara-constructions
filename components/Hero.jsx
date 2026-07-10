@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 
 const icons = [
@@ -18,8 +19,8 @@ export default function Hero(){
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif text-emerald leading-tight">We Build More Than Structures — We Build Trust.</h1>
             <p className="max-w-2xl text-lg text-gray-700/90">Sree Venkatesswara Constructions & Interiors blends modern luxury architecture with South Indian elegance to deliver premium spaces, from villas to interiors, with craftsmanship that reflects trust and timeless design.</p>
             <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-              <a href="/services" className="inline-flex items-center justify-center px-6 py-3 border border-gold text-emerald bg-white/90 rounded-full font-semibold shadow-sm hover:-translate-y-0.5 transition">Our Services</a>
-              <a href="/contact" className="inline-flex items-center justify-center px-6 py-3 bg-emerald text-white rounded-full font-semibold shadow-sm hover:-translate-y-0.5 transition">Get A Quote</a>
+              <Link href="/services" className="inline-flex items-center justify-center px-6 py-3 border border-gold text-emerald bg-white/90 rounded-full font-semibold shadow-sm hover:-translate-y-0.5 transition">Our Services</Link>
+              <Link href="/contact" className="inline-flex items-center justify-center px-6 py-3 bg-emerald text-white rounded-full font-semibold shadow-sm hover:-translate-y-0.5 transition">Get A Quote</Link>
             </div>
           </motion.div>
 

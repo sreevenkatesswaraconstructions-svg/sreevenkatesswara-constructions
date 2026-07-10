@@ -75,7 +75,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })()
         : req.body || {}
 
-      console.log('[ENQUIRY] Received payload:', rawBody)
       const {
         customerName,
         phone,
@@ -101,7 +100,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const trimmedMessage = typeof message === 'string' ? message : typeof notes === 'string' ? notes : ''
 
       if (!trimmedCustomerName || !trimmedPhone || !trimmedService) {
-        console.log('[ENQUIRY] Missing required fields:', { customerName: trimmedCustomerName, phone: trimmedPhone, email: trimmedEmail, service: trimmedService })
         return res.status(400).json({ error: 'Missing required fields' })
       }
 
@@ -111,7 +109,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const isManualEnquiry = normalizedCreatedBy === 'Admin'
       const shouldSendExternalNotifications = !isManualEnquiry && normalizedCreatedBy === 'Website' && normalizedSource === 'Website'
 
-      console.log('[ENQUIRY] Creating enquiry...')
       const enquiry = await prisma.enquiry.create({
         data: {
           customerName: trimmedCustomerName,
@@ -135,10 +132,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         activity: 'Enquiry Created',
         performedBy: typeof performedBy === 'string' && performedBy.trim() ? performedBy.trim() : (normalizedCreatedBy === 'Admin' ? 'Admin' : 'System')
       })
-      console.log('[ENQUIRY] Enquiry created:', enquiry.id)
 
       if (isManualEnquiry) {
-        console.log('[ENQUIRY] Manual enquiry created without external notifications')
         return res.status(201).json(enquiry)
       }
 
@@ -157,7 +152,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (shouldSendExternalNotifications) {
         try {
-          console.log('[ENQUIRY] Sending admin notification email...')
           const emailResult = await sendAdminNotification({
             customerName: trimmedCustomerName,
             customerEmail: trimmedEmail,
@@ -169,7 +163,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           if (emailResult.success) {
             adminEmailSent = true
-            console.log('[ENQUIRY] ✅ Admin notification email sent successfully')
           } else {
             console.error('[ENQUIRY] ❌ Admin notification email failed:', emailResult.error)
           }
@@ -179,8 +172,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (trimmedEmail) {
           try {
-            console.log('[ENQUIRY] Sending customer confirmation email...')
-            console.log('[ENQUIRY] Customer email:', trimmedEmail)
             const autoReplyResult = await sendEnquiryAcknowledgement({
               id: enquiry.id,
               customerName: trimmedCustomerName,
@@ -192,7 +183,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             
             if (autoReplyResult.success) {
               customerEmailSent = true
-              console.log('[ENQUIRY] ✅ Customer confirmation email sent successfully')
             } else {
               customerEmailSent = false
               emailErrorReason = autoReplyResult.error?.message || 'Unknown error'
@@ -205,7 +195,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.error('[ENQUIRY] ❌ Customer confirmation email sending failed with exception:', customerEmailError)
           }
         } else {
-          console.log('[ENQUIRY] Skipping customer confirmation email because no email address was provided')
         }
 
         try {
@@ -233,15 +222,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      console.log('[ENQUIRY] ==================================')
-      console.log('[ENQUIRY] Enquiry creation summary:')
-      console.log('[ENQUIRY] - Enquiry ID:', enquiry.id)
-      console.log('[ENQUIRY] - Admin email sent:', adminEmailSent)
-      console.log('[ENQUIRY] - Customer email sent:', customerEmailSent)
       if (emailErrorReason) {
-        console.log('[ENQUIRY] - Email error reason:', emailErrorReason)
       }
-      console.log('[ENQUIRY] ==================================')
 
       return res.status(201).json(response)
     } catch (error) {

@@ -11,7 +11,7 @@ export default function DashboardOverview({ stats, activities }) {
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Welcome back! Here's what's happening with your business.
+          Welcome back! Here&apos;s what&apos;s happening with your business.
         </p>
       </div>
 

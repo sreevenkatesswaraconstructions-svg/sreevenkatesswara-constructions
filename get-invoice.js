@@ -6,9 +6,7 @@ const prisma = new PrismaClient();
       select: { id: true, invoiceNumber: true }
     });
     if (invoice) {
-      console.log(JSON.stringify(invoice));
     } else {
-      console.log("No invoices found");
     }
   } catch (err) {
     console.error("Error:", err.message);

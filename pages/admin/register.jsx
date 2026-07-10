@@ -23,12 +23,9 @@ export default function AdminRegister() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const handleSendOTP = async (e) => {
-    console.log('=== ADMIN REGISTER FRONTEND SEND OTP ===');
     e.preventDefault()
     setError('')
     setLoading(true)
-    console.log('Email:', email)
-    console.log('Name:', name)
 
     try {
       const response = await fetch('/api/auth/register/send-otp', {
@@ -37,25 +34,16 @@ export default function AdminRegister() {
         body: JSON.stringify({ email, name })
       })
 
-      console.log('Response status:', response.status)
       const data = await response.json()
-      console.log('Response data:', data)
-      console.log('Success:', data.success)
-      console.log('emailSent:', data.emailSent)
-      console.log('devOTP:', data.devOTP)
-      console.log('emailError:', data.emailError)
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to send OTP')
       }
 
-      console.log('✅ API request successful');
-      console.log('Triggering toast: OTP sent to email');
       toast.success('OTP sent to your email')
       
       // In development, show OTP in toast for easier testing
       if (data.devOTP) {
-        console.log('Triggering dev OTP toast:', data.devOTP);
         toast.success(`Development OTP: ${data.devOTP}`, { duration: 10000 })
       }
       
@@ -67,7 +55,6 @@ export default function AdminRegister() {
     } finally {
       setLoading(false)
     }
-    console.log('=== ADMIN REGISTER SEND OTP COMPLETE ===');
   }
 
   const handleVerifyOTP = async (e) => {
@@ -83,7 +70,6 @@ export default function AdminRegister() {
       })
 
       const data = await response.json()
-      console.log('Verify OTP response:', data)
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Invalid OTP')
@@ -125,7 +111,6 @@ export default function AdminRegister() {
       })
 
       const data = await response.json()
-      console.log('Create account response:', data)
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to create account')

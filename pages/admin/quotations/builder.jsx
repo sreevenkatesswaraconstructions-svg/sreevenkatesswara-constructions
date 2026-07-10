@@ -557,7 +557,6 @@ export default function QuotationBuilder({ quotationId }){
   }
 
   async function handleSave(status = 'Draft', showMessage=true){
-    console.log('Quotation save triggered', { status, quotationId })
     // Read live form values first (includes DOM reads for inputs)
     const liveData = getLiveFormData()
 
@@ -579,7 +578,6 @@ export default function QuotationBuilder({ quotationId }){
       enquiryId: liveData.enquiryId || enquiryIdFromQuery || null,
     }
     // Log payload for debugging status-saving issues
-    console.log('Quotation Update Payload:', payload)
     let toastId = null
     setSaveLoading(true)
 
@@ -991,8 +989,6 @@ export default function QuotationBuilder({ quotationId }){
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => { console.log('Save button clicked'); handleSave() }} disabled={saveLoading} className="px-4 py-2 bg-emerald-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{saveLoading ? 'Saving...' : 'Save'}</button>
-              <button type="button" onClick={() => { console.log('Preview button clicked'); handlePreview() }} className="px-4 py-2 border rounded">Preview</button>
               <button type="button" onClick={downloadPdf} disabled={downloadLoading} className="px-4 py-2 border rounded inline-flex items-center gap-2">
                 <Download className="w-4 h-4" /> {downloadLoading ? 'Generating...' : 'Download PDF'}
               </button>

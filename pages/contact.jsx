@@ -16,7 +16,6 @@ export default function Contact(){
     setIsSubmitting(true)
     setSubmitStatus(null)
 
-    console.log('[CONTACT FORM] Submitting enquiry:', formData)
 
     try {
       const response = await fetch('/api/enquiries', {
@@ -34,7 +33,6 @@ export default function Contact(){
       })
 
       const data = await response.json()
-      console.log('[CONTACT FORM] Response:', data)
 
       if (response.ok) {
         setSubmitStatus('success')
@@ -65,7 +63,7 @@ export default function Contact(){
       <section className="mx-auto max-w-3xl">
         <div className="mb-8 text-center lg:text-left">
           <p className="text-sm uppercase tracking-[0.35em] text-gold">Contact</p>
-          <h1 className="mt-3 text-4xl font-serif text-emerald sm:text-5xl">Let's start your next premium project together.</h1>
+          <h1 className="mt-3 text-4xl font-serif text-emerald sm:text-5xl">Let&apos;s start your next premium project together.</h1>
           <p className="mt-4 text-gray-700 leading-relaxed">Send us a message to discuss your construction, renovation or interior requirements. Our team is ready to guide you through every step.</p>
         </div>
 

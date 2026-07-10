@@ -3,21 +3,14 @@ import { prisma } from './prisma';
 import { company } from './company';
 
 // Initialize Resend with API key or fallback
-console.log('=== EMAIL LIBRARY INITIALIZATION ===');
-console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-console.log('RESEND_API_KEY length:', process.env.RESEND_API_KEY?.length || 0);
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
-console.log('Resend client initialized:', !!resend);
 
 // Email configuration - Use testing sender email
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@sreevenkatesswara.com';
 const COMPANY_NAME = company.name;
-console.log('FROM_EMAIL:', FROM_EMAIL);
-console.log('ADMIN_EMAIL:', ADMIN_EMAIL);
-console.log('=================================');
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -37,7 +30,6 @@ const logEmailAttempt = (type: string, to: string, success: boolean, error?: any
     error: error?.message || null,
   };
   
-  console.log(`[Email Log] ${JSON.stringify(logEntry)}`);
   
   // In production, you might want to save this to a database
   return logEntry;
@@ -67,9 +59,7 @@ async function logEmailToDatabase(data: {
           metadata: data.metadata ? JSON.stringify(data.metadata) : null,
         },
       });
-      console.log('[Email Log] Successfully logged to database');
     } else {
-      console.log('[Email Log] EmailLog model not available yet, skipping database log');
     }
   } catch (dbError) {
     console.error('[Email Log] Failed to log to database:', dbError);
@@ -91,12 +81,6 @@ async function sendEmailWithRetry(
   },
   retryCount = 0
 ): Promise<{ success: boolean; data?: any; error?: any }> {
-  console.log('=== SEND EMAIL WITH RETRY ===');
-  console.log('Attempt:', retryCount + 1, '/', MAX_RETRIES);
-  console.log('To:', Array.isArray(params.to) ? params.to.join(', ') : params.to);
-  console.log('From:', params.from || FROM_EMAIL);
-  console.log('Subject:', params.subject);
-  console.log('HTML length:', params.html.length);
   
   const toEmail = Array.isArray(params.to) ? params.to.join(', ') : params.to;
   const emailType = params.emailType || 'general';
@@ -118,13 +102,10 @@ async function sendEmailWithRetry(
       metadata: params.metadata,
     });
     
-    console.log('=================================');
     return { success: false, error };
   }
 
   try {
-    console.log('Sending email to:', toEmail);
-    console.log('Calling resend.emails.send()...');
     const emailParams = {
       from: params.from || FROM_EMAIL,
       to: params.to,
@@ -132,13 +113,8 @@ async function sendEmailWithRetry(
       html: params.html,
       ...(params.attachments?.length ? { attachments: params.attachments } : {}),
     };
-    console.log('Email params:', {
-      ...emailParams,
-      html: '[HTML content omitted]' // Don't log full HTML
-    });
     
     const result = await resend.emails.send(emailParams);
-    console.log('Resend response:', result);
     
     // Check if Resend returned an error in the response
     if (result.error) {
@@ -160,12 +136,9 @@ async function sendEmailWithRetry(
         metadata: params.metadata,
       });
       
-      console.log('=================================');
       return { success: false, error: result.error };
     }
     
-    console.log('✅ Email sent successfully');
-    console.log('✅ Resend data:', result.data);
     
     logEmailAttempt(emailType, toEmail, true);
     
@@ -179,7 +152,6 @@ async function sendEmailWithRetry(
       metadata: params.metadata,
     });
     
-    console.log('=================================');
 
     return { success: true, data: result.data };
   } catch (error: any) {
@@ -193,8 +165,6 @@ async function sendEmailWithRetry(
 
     // Retry on failure
     if (retryCount < MAX_RETRIES) {
-      console.log(`Retrying email send (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
-      console.log(`Waiting ${RETRY_DELAY * (retryCount + 1)}ms before retry...`);
       await delay(RETRY_DELAY * (retryCount + 1)); // Exponential backoff
       return sendEmailWithRetry(params, retryCount + 1);
     }
@@ -210,8 +180,6 @@ async function sendEmailWithRetry(
       metadata: params.metadata,
     });
 
-    console.log('Max retries reached. Giving up.');
-    console.log('=================================');
     return { success: false, error };
   }
 }
@@ -1203,11 +1171,6 @@ export async function sendOTPEmail(params: {
   otp: string;
   expiryMinutes?: number;
 }) {
-  console.log('=== SEND OTP EMAIL ===');
-  console.log('Recipient:', params.to);
-  console.log('Name:', params.name);
-  console.log('OTP:', params.otp);
-  console.log('Expiry minutes:', params.expiryMinutes || 10);
   
   const emailParams = getOTPEmail({
     name: params.name,
@@ -1215,9 +1178,6 @@ export async function sendOTPEmail(params: {
     expiryMinutes: params.expiryMinutes || 10,
   });
 
-  console.log('Email template generated');
-  console.log('Subject:', emailParams.subject);
-  console.log('HTML length:', emailParams.html.length);
 
   const result = await sendEmailWithRetry({
     to: params.to,
@@ -1225,8 +1185,6 @@ export async function sendOTPEmail(params: {
     html: emailParams.html,
   });
 
-  console.log('OTP email send result:', result);
-  console.log('=================================');
 
   return result;
 }
@@ -1541,18 +1499,9 @@ export async function sendAIStyleCustomerEmail(data: {
   message: string;
   enquiryId?: string;
 }) {
-  console.log('=== SEND AI-STYLE CUSTOMER EMAIL ===');
-  console.log('Recipient:', data.customerEmail);
-  console.log('Customer Name:', data.customerName);
-  console.log('Service:', data.service);
-  console.log('Location:', data.location || 'Not provided');
-  console.log('Enquiry ID:', data.enquiryId || 'N/A');
   
   const emailParams = getAIStyleCustomerEmail(data);
 
-  console.log('Email template generated');
-  console.log('Subject:', emailParams.subject);
-  console.log('HTML length:', emailParams.html.length);
 
   const result = await sendEmailWithRetry({
     to: emailParams.to,
@@ -1567,8 +1516,6 @@ export async function sendAIStyleCustomerEmail(data: {
     },
   });
 
-  console.log('AI-style customer email send result:', result);
-  console.log('=================================');
 
   return result;
 }

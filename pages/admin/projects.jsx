@@ -91,7 +91,6 @@ export default function ProjectsPage({ projects }) {
   };
 
   const handleCreateProject = async (data) => {
-    console.log('[PROJECT] Creating project...');
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -110,7 +109,6 @@ export default function ProjectsPage({ projects }) {
 
       if (response.ok) {
         const project = await response.json();
-        console.log('[PROJECT] Project created:', project.id);
         window.location.reload();
       } else {
         console.error('[PROJECT] Failed to create project');
@@ -125,14 +123,12 @@ export default function ProjectsPage({ projects }) {
   const handleDeleteProject = async (id) => {
     if (!confirm('Are you sure you want to delete this project?')) return;
     
-    console.log('[PROJECT] Deleting project:', id);
     try {
       const response = await fetch(`/api/projects/${id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        console.log('[PROJECT] Project deleted');
         window.location.reload();
       } else {
         console.error('[PROJECT] Failed to delete project');
@@ -147,7 +143,6 @@ export default function ProjectsPage({ projects }) {
   const handleUpdateProject = async (data) => {
     if (!selectedProject) return;
     
-    console.log('[PROJECT] Updating project:', selectedProject.id);
     try {
       const response = await fetch(`/api/projects/${selectedProject.id}`, {
         method: 'PUT',
@@ -165,7 +160,6 @@ export default function ProjectsPage({ projects }) {
       });
 
       if (response.ok) {
-        console.log('[PROJECT] Project updated');
         window.location.reload();
       } else {
         console.error('[PROJECT] Failed to update project');
@@ -411,11 +405,9 @@ export default function ProjectsPage({ projects }) {
 
 export async function getServerSideProps() {
   try {
-    console.log('[PROJECT] Fetching projects from database...');
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    console.log('[PROJECT] Fetched', projects.length, 'projects');
     return {
       props: {
         projects: JSON.parse(JSON.stringify(projects)),

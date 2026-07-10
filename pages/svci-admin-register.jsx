@@ -46,17 +46,12 @@ export default function AdminRegister() {
   }
 
   const sendOTP = async () => {
-    console.log('=== FRONTEND SEND OTP ===');
-    console.log('sendOTP called', formData)
-    console.log('Form data:', JSON.stringify(formData, null, 2))
 
     if (!validateStep1()) return
 
     setLoading(true)
     try {
-      console.log('Sending OTP request to /api/auth/register/send-otp')
       const payload = { email: formData.email, name: formData.name }
-      console.log('Payload:', payload)
 
       const response = await fetch('/api/auth/register/send-otp', {
         method: 'POST',
@@ -64,35 +59,21 @@ export default function AdminRegister() {
         body: JSON.stringify(payload)
       })
 
-      console.log('Response status:', response.status)
-      console.log('Response ok:', response.ok)
       const data = await response.json()
-      console.log('=== FRONTEND API RESPONSE ===');
-      console.log('Response data:', data)
-      console.log('Success:', data.success)
-      console.log('emailSent:', data.emailSent)
-      console.log('devOTP:', data.devOTP)
-      console.log('emailError:', data.emailError)
-      console.log('=================================');
 
       if (response.ok && data.success) {
-        console.log('✅ API request successful');
         setOtpSent(true)
         setStep(2)
         setCountdown(600) // 10 minutes
 
-        console.log('=== TOAST NOTIFICATION TRIGGER ===');
         if (data.emailSent) {
-          console.log('Triggering success toast: OTP sent to email');
           toast.success('OTP sent to your email')
         } else {
-          console.log('Triggering error toast: Email not configured');
           toast.error('Email not configured - using development mode')
         }
 
         // Always show OTP for testing
         if (data.devOTP) {
-          console.log('Triggering OTP toast with code:', data.devOTP);
           toast.success(`Your OTP: ${data.devOTP}`, { duration: 10000 })
         }
 
@@ -100,7 +81,6 @@ export default function AdminRegister() {
         if (data.emailError) {
           console.error('Email error from API:', data.emailError)
         }
-        console.log('=================================');
       } else {
         console.error('❌ API request failed');
         console.error('Error message:', data.error);
@@ -113,7 +93,6 @@ export default function AdminRegister() {
       toast.error('Failed to send OTP')
     }
     setLoading(false)
-    console.log('=== FRONTEND SEND OTP COMPLETE ===');
   }
 
   const resendOTP = async () => {
@@ -126,7 +105,6 @@ export default function AdminRegister() {
       })
 
       const data = await response.json()
-      console.log('Resend OTP response:', data)
 
       if (response.ok && data.success) {
         setCountdown(600)
@@ -176,7 +154,6 @@ export default function AdminRegister() {
       })
 
       const data = await response.json()
-      console.log('Create account response:', data)
 
       if (response.ok && data.success) {
         toast.success('Account created successfully!')
@@ -367,7 +344,7 @@ export default function AdminRegister() {
               <div className="space-y-5">
                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                   <p className="text-sm text-emerald-800">
-                    We've sent a 6-digit verification code to <strong>{formData.email}</strong>
+                    We&apos;ve sent a 6-digit verification code to <strong>{formData.email}</strong>
                   </p>
                   <p className="text-xs text-emerald-600 mt-2">
                     💡 Check your email and also look for a toast notification with your OTP

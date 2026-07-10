@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { company, getCallUrl, getEmailUrl, getMapsUrl, getWhatsAppUrl } from '../lib/company'
 
 export default function Footer(){
@@ -24,20 +25,20 @@ export default function Footer(){
         <div>
           <h3 className="text-sm uppercase tracking-[0.3em] text-beige/80 mb-4">Quick Links</h3>
           <ul className="space-y-3 text-sm text-beige/90">
-            <li><a href="/" className="hover:text-white">Home</a></li>
-            <li><a href="/about" className="hover:text-white">About Us</a></li>
-            <li><a href="/services" className="hover:text-white">Services</a></li>
-            <li><a href="/projects" className="hover:text-white">Projects</a></li>
+            <li><Link href="/" className="hover:text-white">Home</Link></li>
+            <li><Link href="/about" className="hover:text-white">About Us</Link></li>
+            <li><Link href="/services" className="hover:text-white">Services</Link></li>
+            <li><Link href="/projects" className="hover:text-white">Projects</Link></li>
           </ul>
         </div>
 
         <div>
           <h3 className="text-sm uppercase tracking-[0.3em] text-beige/80 mb-4">Services</h3>
           <ul className="space-y-3 text-sm text-beige/90">
-            <li><a href="/services#construction" className="hover:text-white">Construction</a></li>
-            <li><a href="/services#interiors" className="hover:text-white">Interiors</a></li>
-            <li><a href="/services#renovation" className="hover:text-white">Renovation</a></li>
-            <li><a href="/services#civil-works" className="hover:text-white">Civil Works</a></li>
+            <li><Link href="/services#construction" className="hover:text-white">Construction</Link></li>
+            <li><Link href="/services#interiors" className="hover:text-white">Interiors</Link></li>
+            <li><Link href="/services#renovation" className="hover:text-white">Renovation</Link></li>
+            <li><Link href="/services#civil-works" className="hover:text-white">Civil Works</Link></li>
           </ul>
         </div>
 

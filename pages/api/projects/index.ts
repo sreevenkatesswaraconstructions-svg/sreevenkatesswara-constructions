@@ -5,7 +5,6 @@ import { createNotification } from '../../../lib/notifications'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      console.log('[PROJECT API] Fetching projects with query:', req.query)
       const { featured, status, category, customerId } = req.query
 
       const where: any = {}
@@ -19,7 +18,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderBy: { createdAt: 'desc' },
       })
 
-      console.log('[PROJECT API] Fetched', projects.length, 'projects')
       return res.status(200).json(projects)
     } catch (error) {
       console.error('[PROJECT API] Error fetching projects:', error)
@@ -29,7 +27,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     try {
-      console.log('[PROJECT API] Creating project...')
       const {
         title,
         projectName,
@@ -83,7 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       })
 
-      console.log('[PROJECT API] Project created:', project.id)
 
       await createNotification({
         title: 'New Project Added',

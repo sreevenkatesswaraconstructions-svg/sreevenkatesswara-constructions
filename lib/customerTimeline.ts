@@ -16,7 +16,6 @@ export async function addCustomerTimelineEvent({
   createdBy?: string | null
 }) {
   if (!customerId?.trim() || !eventType?.trim() || !title?.trim()) {
-    console.warn('Missing required fields for customer timeline event')
     return null
   }
 
