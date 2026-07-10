@@ -45,7 +45,6 @@ export default function Navbar(){
         <div className="hidden md:flex items-center gap-3">
           <a href={getCallUrl(company.primaryPhone)} className="px-4 py-2 border border-emerald text-emerald rounded-xl text-sm">Call</a>
           <a href={getWhatsAppUrl(company.whatsapp)} target="_blank" rel="noreferrer" className="px-4 py-2 bg-emerald text-white rounded-xl text-sm">WhatsApp</a>
-          <Link href="/contact" className="px-5 py-3 bg-gold text-emerald rounded-xl font-semibold text-sm">Get Free Quote</Link>
         </div>
 
         <button onClick={() => setOpen(!open)} className="md:hidden p-3 bg-ivory/90 rounded-full border border-emerald/20 text-emerald shadow-sm">
@@ -66,7 +65,6 @@ export default function Navbar(){
           <div className="flex flex-col gap-3">
             <a href={getCallUrl(company.primaryPhone)} className="px-4 py-3 border border-emerald text-emerald rounded-xl text-center">Call</a>
             <a href={getWhatsAppUrl(company.whatsapp)} target="_blank" rel="noreferrer" className="px-4 py-3 bg-emerald text-white rounded-xl text-center">WhatsApp</a>
-            <Link href="/contact" onClick={() => setOpen(false)} className="px-4 py-3 bg-gold text-emerald rounded-xl text-center">Get Free Quote</Link>
           </div>
         </div>
       )}
