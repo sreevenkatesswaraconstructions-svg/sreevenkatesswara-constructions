@@ -185,15 +185,6 @@ export default function Home(){
           )}
         </section>
 
-        <section className="glass-panel rounded-[2rem] border border-emerald/10 p-10 text-center bg-white/85 shadow-2xl">
-          <p className="text-sm uppercase tracking-[0.35em] text-gold mb-4">Ready to begin</p>
-          <h2 className="text-4xl font-serif text-emerald mb-6">Let’s Build Something Amazing Together</h2>
-          <p className="max-w-3xl mx-auto text-gray-700 mb-8">Begin your next project with a trusted construction and interiors partner that blends premium craftsmanship, spiritual elegance and modern design.</p>
-          <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-            <Link href="/contact" className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-white font-semibold">Contact Us</Link>
-            <Link href="/services" className="inline-flex items-center justify-center rounded-full border border-emerald px-6 py-3 text-emerald">Get Free Quote</Link>
-          </div>
-        </section>
       </main>
     </>
   )
