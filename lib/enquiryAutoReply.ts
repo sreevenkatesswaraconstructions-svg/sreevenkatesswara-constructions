@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { prisma } from './prisma';
+import { company } from './company';
 
 // Initialize Resend with API key or fallback
 console.log('[AUTO-REPLY INIT] Checking Resend configuration...');
@@ -11,7 +12,7 @@ const resend = process.env.RESEND_API_KEY
 console.log('[AUTO-REPLY INIT] Resend client initialized:', !!resend);
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
-const COMPANY_NAME = 'Sree Venkatesswara Constructions';
+const COMPANY_NAME = company.name;
 console.log('[AUTO-REPLY INIT] FROM_EMAIL:', FROM_EMAIL);
 console.log('[AUTO-REPLY INIT] Configuration check complete');
 
@@ -239,11 +240,11 @@ We will contact you shortly.
 
 For urgent assistance:
 
-Phone: 9052468789
-Email: sreevenkatesswaraconstructions@gmail.com
+Phone: ${company.primaryPhone}
+Email: ${company.email}
 
 Regards,
-Sree Venkatesswara Constructions`;
+${company.name}`;
 
   const subject = 'Your Enquiry Is Under Review – Sree Venkatesswara Constructions';
 
@@ -416,8 +417,8 @@ function generateHTMLEmail(data: {
 
           <div class="contact-box">
             <p><strong>For urgent assistance:</strong></p>
-            <p>📞 Phone: 9052468789</p>
-            <p>📧 Email: <a href="mailto:sreevenkatesswaraconstructions@gmail.com">sreevenkatesswaraconstructions@gmail.com</a></p>
+            <p>📞 Phone: ${company.primaryPhone}</p>
+            <p>📧 Email: <a href="mailto:${company.email}">${company.email}</a></p>
           </div>
 
           ${data.enquiryId ? `

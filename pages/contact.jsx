@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import SEO from '../components/SEO'
+import { company, getCallUrl, getEmailUrl, getMapsUrl } from '../lib/company'
 
 const contactMethods = [
-  { title: 'Phone', detail: '9052468789, 8977068789', href: 'tel:+919052468789' },
-  { title: 'Email', detail: 'sreevenkatesswaraconstructions@gmail.com', href: 'mailto:sreevenkatesswaraconstructions@gmail.com' },
-  { title: 'Office', detail: '50-58-8, Rajendranagar, Backside of Prism College, Seethammapeta, Vishakhapatnam - 530016', href: 'https://www.google.com/maps?q=50-58-8+Rajendranagar+Vishakhapatnam' }
+  { title: 'Phone', detail: `${company.primaryPhone}, ${company.secondaryPhone}`, href: getCallUrl(company.primaryPhone) },
+  { title: 'Email', detail: company.email, href: getEmailUrl(company.email) },
+  { title: 'Office', detail: company.address, href: getMapsUrl(company.address) }
 ]
 
 export default function Contact(){
@@ -163,11 +164,11 @@ export default function Contact(){
           <h3 className="text-sm uppercase tracking-[0.35em] text-gold">Personal Contact</h3>
           <p className="text-gray-700 mt-3"><strong>SREE VENKATESSWARA</strong></p>
           <p className="text-gray-700">CONSTRUCTIONS & INTERIORS</p>
-          <p className="text-gray-700">[BUILDING DREAMS, CREATING SPACES.]</p>
-          <p className="text-gray-700">Phone: <a href="tel:+919052468789" className="text-emerald">9052468789</a> &nbsp;|&nbsp; <a href="tel:+918977068789" className="text-emerald">8977068789</a></p>
-          <p className="text-gray-700">Email: <a href="mailto:sreevenkatesswaraconstructions@gmail.com" className="text-emerald">sreevenkatesswaraconstructions@gmail.com</a></p>
-          <p className="text-gray-700">Website: <a href="https://www.sreevenkatesswaraconstructions.com" className="text-emerald">www.sreevenkatesswaraconstructions.com</a></p>
-          <p className="text-gray-700">Address: 50-58-8, Rajendranagar, Backside of Prism College, Seethammapeta, Vishakhapatnam - 530016</p>
+          <p className="text-gray-700">[{company.tagline.toUpperCase()}]</p>
+          <p className="text-gray-700">Phone: <a href={getCallUrl(company.primaryPhone)} className="text-emerald">{company.primaryPhone}</a> &nbsp;|&nbsp; <a href={getCallUrl(company.secondaryPhone)} className="text-emerald">{company.secondaryPhone}</a></p>
+          <p className="text-gray-700">Email: <a href={getEmailUrl(company.email)} className="text-emerald">{company.email}</a></p>
+          <p className="text-gray-700">Website: <a href={company.website} className="text-emerald">{company.website.replace('https://www.', '')}</a></p>
+          <p className="text-gray-700">Address: {company.address}</p>
         </div>
       </section> 
 

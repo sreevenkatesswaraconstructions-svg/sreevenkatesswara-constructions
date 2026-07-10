@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { company, getCallUrl, getWhatsAppUrl } from '../lib/company'
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -42,8 +43,8 @@ export default function Navbar(){
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <a href="tel:+919000000000" className="px-4 py-2 border border-emerald text-emerald rounded-xl text-sm">Call</a>
-          <a href="https://wa.me/919000000000" target="_blank" rel="noreferrer" className="px-4 py-2 bg-emerald text-white rounded-xl text-sm">WhatsApp</a>
+          <a href={getCallUrl(company.primaryPhone)} className="px-4 py-2 border border-emerald text-emerald rounded-xl text-sm">Call</a>
+          <a href={getWhatsAppUrl(company.whatsapp)} target="_blank" rel="noreferrer" className="px-4 py-2 bg-emerald text-white rounded-xl text-sm">WhatsApp</a>
           <Link href="/contact" className="px-5 py-3 bg-gold text-emerald rounded-xl font-semibold text-sm">Get Free Quote</Link>
         </div>
 
@@ -63,8 +64,8 @@ export default function Navbar(){
             ))}
           </div>
           <div className="flex flex-col gap-3">
-            <a href="tel:+919000000000" className="px-4 py-3 border border-emerald text-emerald rounded-xl text-center">Call</a>
-            <a href="https://wa.me/919000000000" target="_blank" rel="noreferrer" className="px-4 py-3 bg-emerald text-white rounded-xl text-center">WhatsApp</a>
+            <a href={getCallUrl(company.primaryPhone)} className="px-4 py-3 border border-emerald text-emerald rounded-xl text-center">Call</a>
+            <a href={getWhatsAppUrl(company.whatsapp)} target="_blank" rel="noreferrer" className="px-4 py-3 bg-emerald text-white rounded-xl text-center">WhatsApp</a>
             <Link href="/contact" onClick={() => setOpen(false)} className="px-4 py-3 bg-gold text-emerald rounded-xl text-center">Get Free Quote</Link>
           </div>
         </div>

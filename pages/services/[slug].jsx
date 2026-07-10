@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import SEO from '../../components/SEO'
 import ClickableImage from '../../components/ClickableImage'
 import { Loader2, Layers } from 'lucide-react'
+import { company, getCallUrl, getWhatsAppUrl } from '../../lib/company'
 
 export default function ServiceDetail() {
   const router = useRouter()
@@ -74,11 +75,11 @@ export default function ServiceDetail() {
             <Link href="/contact" className="rounded-full bg-emerald-600 px-6 py-3 text-white font-semibold hover:bg-emerald-700 transition-colors">
               Get Quote
             </Link>
-            <a href="tel:+919876543210" className="rounded-full border border-emerald-600 px-6 py-3 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+            <a href={getCallUrl(company.primaryPhone)} className="rounded-full border border-emerald-600 px-6 py-3 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
               Call Now
             </a>
             <a 
-              href="https://wa.me/919876543210" 
+              href={getWhatsAppUrl(company.whatsapp)} 
               target="_blank" 
               rel="noopener noreferrer" 
               className="rounded-full bg-green-600 px-6 py-3 text-white font-semibold hover:bg-green-700 transition-colors"
@@ -130,11 +131,11 @@ export default function ServiceDetail() {
           <Link href="/contact" className="rounded-full bg-emerald-600 px-6 py-3 text-white font-semibold hover:bg-emerald-700 transition-colors">
             Get Quote
           </Link>
-          <a href="tel:+919876543210" className="rounded-full border border-emerald-600 px-6 py-3 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+          <a href={getCallUrl(company.primaryPhone)} className="rounded-full border border-emerald-600 px-6 py-3 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
             Call Now
           </a>
           <a 
-            href="https://wa.me/919876543210" 
+            href={getWhatsAppUrl(company.whatsapp)} 
             target="_blank" 
             rel="noopener noreferrer" 
             className="rounded-full bg-green-600 px-6 py-3 text-white font-semibold hover:bg-green-700 transition-colors"

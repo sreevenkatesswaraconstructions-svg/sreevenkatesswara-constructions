@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { prisma } from './prisma';
+import { company } from './company';
 
 // Initialize Resend with API key or fallback
 console.log('=== EMAIL LIBRARY INITIALIZATION ===');
@@ -13,7 +14,7 @@ console.log('Resend client initialized:', !!resend);
 // Email configuration - Use testing sender email
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@sreevenkatesswara.com';
-const COMPANY_NAME = 'Sree Venkatesswara Constructions & Interiors';
+const COMPANY_NAME = company.name;
 console.log('FROM_EMAIL:', FROM_EMAIL);
 console.log('ADMIN_EMAIL:', ADMIN_EMAIL);
 console.log('=================================');
@@ -574,15 +575,15 @@ export function getCustomerConfirmationEmail(data: {
 
         <div class="contact-info">
           <p><strong>Need immediate assistance?</strong></p>
-          <p>📞 Call us: +91 98765 43210</p>
-          <p>📧 Email us: info@sreevenkatesswara.com</p>
+          <p>📞 Call us: ${company.primaryPhone}</p>
+          <p>📧 Email us: ${company.email}</p>
         </div>
 
         <div class="footer">
           <h3>${COMPANY_NAME}</h3>
-          <p>Building Dreams, Creating Spaces</p>
+          <p>${company.tagline}</p>
           <div class="social-links">
-            <a href="#">Website</a> | <a href="#">Facebook</a> | <a href="#">Instagram</a>
+            <a href="${company.website}">Website</a> | <a href="${company.instagram}">Instagram</a>
           </div>
         </div>
       </div>
@@ -1246,11 +1247,11 @@ Summary of your enquiry:
 ${serviceResponse.nextSteps}
 
 For urgent assistance:
-Phone: 9052468789
-Email: sreevenkatesswaraconstructions@gmail.com
+Phone: ${company.primaryPhone}
+Email: ${company.email}
 
 Regards,
-Sree Venkatesswara Constructions`;
+${company.name}`;
 
   const subject = `Your Enquiry is Under Review – Sree Venkatesswara Constructions`;
 
@@ -1424,8 +1425,8 @@ export function getAIStyleCustomerEmail(data: {
 
           <div class="contact-box">
             <p><strong>For urgent assistance:</strong></p>
-            <p>📞 Phone: 9052468789</p>
-            <p>📧 Email: <a href="mailto:sreevenkatesswaraconstructions@gmail.com" style="color: #ea580c;">sreevenkatesswaraconstructions@gmail.com</a></p>
+            <p>📞 Phone: ${company.primaryPhone}</p>
+            <p>📧 Email: <a href="mailto:${company.email}" style="color: #ea580c;">${company.email}</a></p>
           </div>
 
           ${data.enquiryId ? `
