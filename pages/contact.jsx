@@ -1,12 +1,5 @@
 import { useState } from 'react'
 import SEO from '../components/SEO'
-import { company, getCallUrl, getEmailUrl, getMapsUrl } from '../lib/company'
-
-const contactMethods = [
-  { title: 'Phone', detail: `${company.primaryPhone}, ${company.secondaryPhone}`, href: getCallUrl(company.primaryPhone) },
-  { title: 'Email', detail: company.email, href: getEmailUrl(company.email) },
-  { title: 'Office', detail: company.address, href: getMapsUrl(company.address) }
-]
 
 export default function Contact(){
   const [formData, setFormData] = useState({
@@ -66,25 +59,17 @@ export default function Contact(){
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-20 space-y-16">
+    <main className="mx-auto max-w-7xl px-6 py-12 md:py-20">
       <SEO title="Contact — Sree Venkatesswara Constructions & Interiors" description="Reach out for luxury construction, interior design and project consultations." />
 
-      <section className="grid gap-10 lg:grid-cols-[1fr_0.9fr] items-center">
-        <div className="space-y-6">
+      <section className="mx-auto max-w-3xl">
+        <div className="mb-8 text-center lg:text-left">
           <p className="text-sm uppercase tracking-[0.35em] text-gold">Contact</p>
-          <h1 className="text-5xl font-serif text-emerald">Let's start your next premium project together.</h1>
-          <p className="text-gray-700 leading-relaxed">Send us a message or connect directly by phone or WhatsApp to discuss your construction, renovation or interior requirements. Our team is ready to guide you through every step.</p>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {contactMethods.map(item => (
-              <a key={item.title} href={item.href} target="_blank" rel="noreferrer" className="glass-panel rounded-[1.75rem] border border-emerald/10 p-6 text-gray-700 hover:border-emerald hover:text-emerald transition">
-                <p className="text-sm uppercase tracking-[0.35em] text-gold mb-2">{item.title}</p>
-                <p className="font-semibold break-all">{item.detail}</p>
-              </a>
-            ))}
-          </div>
+          <h1 className="mt-3 text-4xl font-serif text-emerald sm:text-5xl">Let's start your next premium project together.</h1>
+          <p className="mt-4 text-gray-700 leading-relaxed">Send us a message to discuss your construction, renovation or interior requirements. Our team is ready to guide you through every step.</p>
         </div>
 
-        <div className="glass-panel rounded-[2rem] border border-emerald/10 p-10 shadow-2xl">
+        <div className="glass-panel rounded-[2rem] border border-emerald/10 p-8 shadow-2xl sm:p-10">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm text-gray-700 mb-2">Name</label>
@@ -149,39 +134,6 @@ export default function Contact(){
               {isSubmitting ? 'Sending...' : 'Send Inquiry'}
             </button>
           </form>
-        </div>
-      </section>
-
-      <section className="mt-8 grid gap-8 lg:grid-cols-2 items-center">
-        <div className="space-y-4">
-          <h3 className="text-sm uppercase tracking-[0.35em] text-gold">Business Card</h3>
-          <p className="text-gray-700">Download or view the business card for quick contact details.</p>
-          <a href="/images/business card.jpeg" target="_blank" rel="noreferrer" className="inline-block mt-3 rounded-lg overflow-hidden border border-emerald/10 shadow-lg">
-            <img src="/images/business card.jpeg" alt="Business card" className="w-full max-w-sm object-cover" />
-          </a>
-        </div>
-        <div>
-          <h3 className="text-sm uppercase tracking-[0.35em] text-gold">Personal Contact</h3>
-          <p className="text-gray-700 mt-3"><strong>SREE VENKATESSWARA</strong></p>
-          <p className="text-gray-700">CONSTRUCTIONS & INTERIORS</p>
-          <p className="text-gray-700">[{company.tagline.toUpperCase()}]</p>
-          <p className="text-gray-700">Phone: <a href={getCallUrl(company.primaryPhone)} className="text-emerald">{company.primaryPhone}</a> &nbsp;|&nbsp; <a href={getCallUrl(company.secondaryPhone)} className="text-emerald">{company.secondaryPhone}</a></p>
-          <p className="text-gray-700">Email: <a href={getEmailUrl(company.email)} className="text-emerald">{company.email}</a></p>
-          <p className="text-gray-700">Website: <a href={company.website} className="text-emerald">{company.website.replace('https://www.', '')}</a></p>
-          <p className="text-gray-700">Address: {company.address}</p>
-        </div>
-      </section> 
-
-      <section className="rounded-[2rem] border border-emerald/10 bg-white/80 p-8 shadow-2xl">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center">
-          <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-gold">Branch</p>
-            <h2 className="text-3xl font-serif text-emerald mb-4">Office & Appointment</h2>
-            <p className="text-gray-700 leading-relaxed">Visit our studio or request an on-site appointment for your residential, commercial or villa project.</p>
-          </div>
-          <div className="overflow-hidden rounded-[1.75rem] border border-emerald/10">
-            <iframe src="https://www.google.com/maps?q=50-58-8+Rajendranagar+Vishakhapatnam&output=embed" width="100%" height="280" loading="lazy" className="border-0"></iframe>
-          </div>
         </div>
       </section>
     </main>

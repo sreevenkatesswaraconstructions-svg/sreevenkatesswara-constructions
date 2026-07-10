@@ -1,14 +1,41 @@
 import Link from 'next/link'
 
-export default function ProjectCard({ project }){
-  // Parse images from comma-separated string
-  const images = project.images ? project.images.split(',').map(url => url.trim()) : [];
-  const firstImage = images[0] || 'https://images.unsplash.com/photo-1505691723518-36a6f6af4a2f?w=1200';
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1505691723518-36a6f6af4a2f?w=1200'
+
+function getProjectImage(project) {
+  if (!project) return PLACEHOLDER_IMAGE
+
+  const rawImages = project.images
+  if (Array.isArray(rawImages)) {
+    const firstImage = rawImages.find(Boolean)
+    return firstImage || PLACEHOLDER_IMAGE
+  }
+
+  if (typeof rawImages === 'string') {
+    const images = rawImages
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean)
+
+    return images[0] || PLACEHOLDER_IMAGE
+  }
+
+  return PLACEHOLDER_IMAGE
+}
+
+export default function ProjectCard({ project }) {
+  const firstImage = getProjectImage(project)
 
   return (
     <Link href={`/projects/${project.id}`} className="group block overflow-hidden rounded-[2rem] border border-emerald/10 bg-white/90 shadow-lg transition-transform transform hover:-translate-y-1 hover:shadow-2xl">
       <div className="h-72 overflow-hidden bg-gray-100">
-        <img src={firstImage} alt={project.title} className="h-full w-full object-contain transition-transform duration-700 group-hover:scale-105" />
+        <img
+          src={firstImage}
+          alt={project.title}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
       </div>
       <div className="p-6">
         <p className="text-xs uppercase tracking-[0.35em] text-gold/90 mb-3">{project.category}</p>
