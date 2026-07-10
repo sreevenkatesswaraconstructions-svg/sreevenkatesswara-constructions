@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import AdminLayout from '../../../components/admin/AdminLayout'
-import { Plus, Trash2, Copy, UploadCloud, FileText, Printer, Mail, MessageSquare, Download, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, Copy, UploadCloud, FileText, Printer, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { buildQuotationHtml } from '../../../lib/quotationDocument'
 import { DEFAULT_QUOTATION_TERMS, DEFAULT_QUOTATION_NOTES } from '../../../lib/quotationDefaults'
@@ -27,8 +27,6 @@ export default function QuotationBuilder({ quotationId }){
   const [servicesList, setServicesList] = useState([])
   const [validationErrors, setValidationErrors] = useState({})
   const [downloadLoading, setDownloadLoading] = useState(false)
-  const [emailLoading, setEmailLoading] = useState(false)
-  const [whatsappLoading, setWhatsappLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [currentId, setCurrentId] = useState(quotationId || null)
   const [unsaved, setUnsaved] = useState(false)
@@ -651,59 +649,6 @@ export default function QuotationBuilder({ quotationId }){
 
   async function handleAutoSave(){ if (!unsaved) return; await handleSave('Draft', false) }
 
-  function handleSendEmail(){ sendEmail() }
-
-  function handleSendWhatsApp(){ sendWhatsApp() }
-
-  async function sendWhatsApp(){
-    if (!currentId) return toast.error('Please save quotation first')
-    const url = encodeURIComponent(window.location.origin + '/quotations/' + currentId)
-    const text = encodeURIComponent(`Please review our quotation - ${data.quotationNumber || 'SVC-' + new Date().getFullYear()}`)
-    window.open(`https://wa.me/?text=${text}%0A%0A${url}`)
-  }
-
-  async function sendEmail(){
-    if (!emailLoading) {
-      if (!data.customerEmail || !String(data.customerEmail).trim()) {
-        return toast.error('Customer email is required to send quotation')
-      }
-      if (!currentId) {
-        return toast.error('Please save quotation before sending email')
-      }
-
-      setEmailLoading(true)
-      try {
-        const html = buildQuotationHtml(data, settings, { baseUrl: window.location.origin, servicesList })
-        const subject = `Quotation: ${data.quotationNumber || 'SVC-' + new Date().getFullYear()}`
-        const { base64, fileName } = await exportPreviewToPdf({ saveFile: false })
-
-        const response = await fetch('/api/email/quotation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: data.customerEmail,
-            subject,
-            html,
-            attachmentBase64: base64,
-            attachmentFileName: fileName,
-          })
-        })
-
-        const result = await response.json()
-        if (result.success) {
-          toast.success('Quotation email sent successfully')
-        } else {
-          throw new Error(result.message || 'Failed to send email')
-        }
-      } catch (err) {
-        console.error('Email send error:', err)
-        toast.error('Unable to send email. Please check console for details.')
-      } finally {
-        setEmailLoading(false)
-      }
-    }
-  }
-
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -1044,12 +989,6 @@ export default function QuotationBuilder({ quotationId }){
                 <Download className="w-4 h-4" /> {downloadLoading ? 'Generating...' : 'Download PDF'}
               </button>
               <button type="button" onClick={handlePrint} className="px-4 py-2 border rounded inline-flex items-center gap-2"><Printer /> Print</button>
-            </div>
-            <div className="flex gap-2 items-center flex-wrap">
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={handleSendEmail} disabled={emailLoading} className="px-3 py-2 border rounded inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Mail /> {emailLoading ? 'Sending...' : 'Send Email'}</button>
-              <button onClick={handleSendWhatsApp} disabled={whatsappLoading} className="px-3 py-2 border rounded inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><MessageSquare /> {whatsappLoading ? 'Preparing...' : 'Share WhatsApp'}</button>
             </div>
           </div>
           {showPreview ? (
