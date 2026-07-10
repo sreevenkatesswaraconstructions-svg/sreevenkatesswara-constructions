@@ -26,6 +26,8 @@ const reasons = [
 export default function Home(){
   const [featuredTestimonials, setFeaturedTestimonials] = useState([])
   const [isLoadingTestimonials, setIsLoadingTestimonials] = useState(true)
+  const [servicesData, setServicesData] = useState([])
+  const [isLoadingServices, setIsLoadingServices] = useState(true)
 
   useEffect(() => {
     let isMounted = true
@@ -67,6 +69,41 @@ export default function Home(){
     }
   }, [])
 
+  const previewItems = (servicesData && servicesData.length > 0) ? servicesData.slice(0, 4) : services
+  const displayItems = previewItems.map(item => ({
+    title: item.serviceName || item.title,
+    description: item.shortDescription || item.description,
+    slug: item.slug,
+    image: item.image || null
+  }))
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchServices = async () => {
+      try {
+        const response = await fetch('/api/services?status=ACTIVE')
+        const result = await response.json()
+        if (!isMounted) return
+
+        if (result.success) {
+          setServicesData(result.data || [])
+        } else {
+          setServicesData([])
+        }
+      } catch (error) {
+        console.error('[HOME SERVICES] Error fetching services:', error)
+        if (isMounted) setServicesData([])
+      } finally {
+        if (isMounted) setIsLoadingServices(false)
+      }
+    }
+
+    fetchServices()
+
+    return () => { isMounted = false }
+  }, [])
+
   return (
     <>
       <SEO title="Sree Venkatesswara Constructions & Interiors" description="Building dreams and creating luxury spaces with premium construction and interiors." />
@@ -98,8 +135,8 @@ export default function Home(){
             <Link href="/services" className="inline-flex items-center justify-center rounded-full border border-emerald px-5 py-3 text-sm text-emerald hover:bg-emerald/5">View all services</Link>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            {services.map(service => (
-              <ServiceCard key={service.title} title={service.title} description={service.description} href={`/services/${service.slug}`} />
+            {displayItems.map(service => (
+              <ServiceCard key={service.title} title={service.title} description={service.description} href={`/services/${service.slug}`} image={service.image} />
             ))}
           </div>
         </section>
