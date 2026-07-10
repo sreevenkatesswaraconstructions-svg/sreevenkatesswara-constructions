@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import { Plus, Trash2, Copy, UploadCloud, FileText, Printer, Download, ChevronDown, ChevronUp } from 'lucide-react'
@@ -652,6 +653,13 @@ export default function QuotationBuilder({ quotationId }){
   return (
     <AdminLayout>
       <div className="space-y-6">
+        <div>
+          <Link href="/admin/quotations" className="inline-flex items-center gap-2 self-start rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+            <span aria-hidden="true">←</span>
+            Back to Quotations
+          </Link>
+        </div>
+
         <div className="bg-white p-4 rounded">
           <h3 className="font-semibold mb-2">Section 1 — Customer Information</h3>
           <div className="grid grid-cols-2 gap-3">

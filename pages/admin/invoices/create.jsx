@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
@@ -234,11 +235,19 @@ export default function CreateInvoicePage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create Invoice</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Create a new invoice for a customer and optional project.
-          </p>
+        <div className="space-y-3">
+          <div>
+            <Link href="/admin/invoices" className="inline-flex items-center gap-2 self-start rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+              <span aria-hidden="true">←</span>
+              Back to Invoices
+            </Link>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create Invoice</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Create a new invoice for a customer and optional project.
+            </p>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">

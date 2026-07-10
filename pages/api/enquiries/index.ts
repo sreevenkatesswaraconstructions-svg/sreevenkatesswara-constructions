@@ -1,6 +1,6 @@
 import { prisma } from '../../../lib/prisma'
 import { NextApiRequest, NextApiResponse } from 'next'
-import { sendEnquiryEmails } from '../../../lib/email'
+import { sendAdminNotification } from '../../../lib/email'
 import { sendEnquiryAcknowledgement } from '../../../lib/enquiryAutoReply'
 import { sendEnquiryWhatsAppMessages } from '../../../lib/whatsapp'
 import { createNotification } from '../../../lib/notifications'
@@ -158,51 +158,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (shouldSendExternalNotifications) {
         try {
           console.log('[ENQUIRY] Sending admin notification email...')
-          const emailResult = await sendEnquiryEmails({
-            name: trimmedCustomerName,
-            email: trimmedEmail,
-            phone: trimmedPhone,
-            service: trimmedService,
+          const emailResult = await sendAdminNotification({
+            customerName: trimmedCustomerName,
+            customerEmail: trimmedEmail,
+            customerPhone: trimmedPhone,
+            serviceRequested: trimmedService,
             message: trimmedMessage || '',
             budget: typeof budget === 'string' ? budget : '',
-            enquiryId: enquiry.id
           })
           
-          if (emailResult.admin && emailResult.admin.success) {
+          if (emailResult.success) {
             adminEmailSent = true
             console.log('[ENQUIRY] ✅ Admin notification email sent successfully')
           } else {
-            console.error('[ENQUIRY] ❌ Admin notification email failed:', emailResult.admin?.error)
+            console.error('[ENQUIRY] ❌ Admin notification email failed:', emailResult.error)
           }
         } catch (adminEmailError) {
           console.error('[ENQUIRY] ❌ Admin email sending failed with exception:', adminEmailError)
         }
 
-        try {
-          console.log('[ENQUIRY] Sending intelligent customer acknowledgement email...')
-          console.log('[ENQUIRY] Customer email:', trimmedEmail)
-          const autoReplyResult = await sendEnquiryAcknowledgement({
-            id: enquiry.id,
-            customerName: trimmedCustomerName,
-            email: trimmedEmail,
-            service: trimmedService,
-            location: typeof location === 'string' ? location : null,
-            message: trimmedMessage || null
-          })
-          
-          if (autoReplyResult.success) {
-            customerEmailSent = true
-            console.log('[ENQUIRY] ✅ Customer acknowledgement email sent successfully')
-          } else {
+        if (trimmedEmail) {
+          try {
+            console.log('[ENQUIRY] Sending customer confirmation email...')
+            console.log('[ENQUIRY] Customer email:', trimmedEmail)
+            const autoReplyResult = await sendEnquiryAcknowledgement({
+              id: enquiry.id,
+              customerName: trimmedCustomerName,
+              email: trimmedEmail,
+              service: trimmedService,
+              location: typeof location === 'string' ? location : null,
+              message: trimmedMessage || null
+            })
+            
+            if (autoReplyResult.success) {
+              customerEmailSent = true
+              console.log('[ENQUIRY] ✅ Customer confirmation email sent successfully')
+            } else {
+              customerEmailSent = false
+              emailErrorReason = autoReplyResult.error?.message || 'Unknown error'
+              console.error('[ENQUIRY] ❌ Customer confirmation email failed:', autoReplyResult.error)
+              console.error('[ENQUIRY] ❌ Error reason:', emailErrorReason)
+            }
+          } catch (customerEmailError) {
             customerEmailSent = false
-            emailErrorReason = autoReplyResult.error?.message || 'Unknown error'
-            console.error('[ENQUIRY] ❌ Customer acknowledgement email failed:', autoReplyResult.error)
-            console.error('[ENQUIRY] ❌ Error reason:', emailErrorReason)
+            emailErrorReason = customerEmailError instanceof Error ? customerEmailError.message : 'Unknown error'
+            console.error('[ENQUIRY] ❌ Customer confirmation email sending failed with exception:', customerEmailError)
           }
-        } catch (customerEmailError) {
-          customerEmailSent = false
-          emailErrorReason = customerEmailError instanceof Error ? customerEmailError.message : 'Unknown error'
-          console.error('[ENQUIRY] ❌ Customer email sending failed with exception:', customerEmailError)
+        } else {
+          console.log('[ENQUIRY] Skipping customer confirmation email because no email address was provided')
         }
 
         try {
