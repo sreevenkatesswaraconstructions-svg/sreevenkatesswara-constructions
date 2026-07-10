@@ -15,18 +15,50 @@ export async function getServerSideProps() {
     console.log('[DASHBOARD] Fetching real-time database counts...');
     console.log('[DASHBOARD] Fetching recent activities...');
 
-    // Fetch real counts from database
-    const enquiryCount = await prisma.enquiry.count();
-    const projectCount = await prisma.project.count();
-    const ongoingProjectCount = await prisma.project.count({ where: { status: 'ONGOING' } });
-    const completedProjectCount = await prisma.project.count({ where: { status: 'COMPLETED' } });
-    const blogCount = await prisma.blog.count();
-    const serviceCount = await prisma.service.count();
+    const completedStatus = 'Completed';
+
+    // Fetch live counts from database and keep the dashboard resilient if any query fails.
+    const [
+      enquiryCountResult,
+      projectCountResult,
+      activeProjectCountResult,
+      completedProjectCountResult,
+      blogCountResult,
+      serviceCountResult,
+    ] = await Promise.allSettled([
+      prisma.enquiry.count(),
+      prisma.project.count(),
+      prisma.project.count({
+        where: {
+          status: {
+            not: {
+              equals: completedStatus,
+            },
+          },
+        },
+      }),
+      prisma.project.count({
+        where: {
+          status: {
+            equals: completedStatus,
+          },
+        },
+      }),
+      prisma.blog.count(),
+      prisma.service.count(),
+    ]);
+
+    const enquiryCount = enquiryCountResult.status === 'fulfilled' ? enquiryCountResult.value : 0;
+    const projectCount = projectCountResult.status === 'fulfilled' ? projectCountResult.value : 0;
+    const activeProjectCount = activeProjectCountResult.status === 'fulfilled' ? activeProjectCountResult.value : 0;
+    const completedProjectCount = completedProjectCountResult.status === 'fulfilled' ? completedProjectCountResult.value : 0;
+    const blogCount = blogCountResult.status === 'fulfilled' ? blogCountResult.value : 0;
+    const serviceCount = serviceCountResult.status === 'fulfilled' ? serviceCountResult.value : 0;
 
     // Log the counts
     console.log('[DASHBOARD] Enquiries:', enquiryCount);
     console.log('[DASHBOARD] Projects:', projectCount);
-    console.log('[DASHBOARD] Ongoing Projects:', ongoingProjectCount);
+    console.log('[DASHBOARD] Active Projects:', activeProjectCount);
     console.log('[DASHBOARD] Completed Projects:', completedProjectCount);
     console.log('[DASHBOARD] Blogs:', blogCount);
     console.log('[DASHBOARD] Services:', serviceCount);
@@ -71,7 +103,7 @@ export async function getServerSideProps() {
         select: {
           id: true,
           serviceName: true,
-          description: true,
+          shortDescription: true,
           createdAt: true,
         },
       }),
@@ -104,7 +136,7 @@ export async function getServerSideProps() {
         id: `service-${s.id}`,
         type: 'service',
         title: `Service added: ${s.serviceName}`,
-        description: s.description?.substring(0, 50) + (s.description?.length > 50 ? '...' : '') || 'New service',
+        description: s.shortDescription?.substring(0, 50) + (s.shortDescription?.length > 50 ? '...' : '') || 'New service',
         createdAt: s.createdAt.toISOString(),
       })),
     ];
@@ -119,15 +151,15 @@ export async function getServerSideProps() {
       {
         title: 'Total Enquiries',
         value: enquiryCount.toString(),
-        change: '+12%',
+        change: '+0%',
         trend: 'up',
         icon: 'MessageSquare',
         color: 'emerald'
       },
       {
         title: 'Active Projects',
-        value: ongoingProjectCount.toString(),
-        change: '+3',
+        value: activeProjectCount.toString(),
+        change: '+0',
         trend: 'up',
         icon: 'FolderKanban',
         color: 'blue'
@@ -135,7 +167,7 @@ export async function getServerSideProps() {
       {
         title: 'Completed Projects',
         value: completedProjectCount.toString(),
-        change: '+5',
+        change: '+0',
         trend: 'up',
         icon: 'CheckCircle',
         color: 'green'
@@ -143,7 +175,7 @@ export async function getServerSideProps() {
       {
         title: 'Blog Posts',
         value: blogCount.toString(),
-        change: '+2',
+        change: '+0',
         trend: 'up',
         icon: 'FileText',
         color: 'purple'
@@ -151,7 +183,7 @@ export async function getServerSideProps() {
       {
         title: 'Services',
         value: serviceCount.toString(),
-        change: '+1',
+        change: '+0',
         trend: 'up',
         icon: 'Settings',
         color: 'orange'

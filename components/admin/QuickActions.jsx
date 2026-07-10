@@ -1,28 +1,30 @@
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/router';
 import { Plus, MessageSquare, FolderKanban, FileText, Upload } from 'lucide-react';
 
 export default function QuickActions() {
+  const router = useRouter();
   const actions = [
     {
       title: 'New Enquiry',
       description: 'Add a new customer enquiry',
       icon: MessageSquare,
       color: 'emerald',
-      path: '/admin/enquiries/new'
+      path: '/admin/enquiries'
     },
     {
       title: 'New Project',
       description: 'Create a new project',
       icon: FolderKanban,
       color: 'blue',
-      path: '/admin/projects/new'
+      path: '/admin/projects'
     },
     {
       title: 'New Blog Post',
       description: 'Write a new article',
       icon: FileText,
       color: 'purple',
-      path: '/admin/blogs/new'
+      path: '/admin/blogs'
     },
     {
       title: 'Upload File',
@@ -59,11 +61,13 @@ export default function QuickActions() {
           return (
             <motion.button
               key={action.title}
+              type="button"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => router.push(action.path)}
               className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700 transition-all duration-200 ${colorMap[action.color]}`}
             >
               <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${iconColorMap[action.color]}`}>

@@ -1,27 +1,12 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// Enum for payment types
-enum PaymentType {
-  Advance
-  FirstInstallment
-  SecondInstallment
-  ThirdInstallment
-  FinalPayment
-  ExtraWork
-  Refund
-  Other
-}
-
-// User model for authentication and role-based access
 model User {
   id            String    @id @default(cuid())
   name          String
@@ -43,7 +28,6 @@ model User {
   @@index([email])
 }
 
-// OTPVerification model for storing OTPs during registration
 model OTPVerification {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -56,30 +40,28 @@ model OTPVerification {
   @@index([email])
 }
 
-// Enquiry model for customer enquiries
 model Enquiry {
-  id           String   @id @default(cuid())
-  customerName String
-  phone        String
-  email        String?
-  service      String
-  budget       String?
-  location     String?
-  message      String?
-  status       String   @default("New")
-  source       String   @default("Website")
-  createdBy    String   @default("Website")
-  isContacted  Boolean  @default(false)
-  followUpDate DateTime?
-  followUpTime String?
+  id            String            @id @default(cuid())
+  customerName  String
+  phone         String
+  email         String?
+  service       String
+  budget        String?
+  location      String?
+  message       String?
+  status        String            @default("New")
+  isContacted   Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  createdBy     String            @default("Website")
+  source        String            @default("Website")
+  followUpDate  DateTime?
   followUpNotes String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  activities   EnquiryActivity[]
-  quotations   Quotation[]
-  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  customerId   String?
+  followUpTime  String?
+  customerId    String?
+  customer      Customer?         @relation(fields: [customerId], references: [id])
+  activities    EnquiryActivity[]
+  quotations    Quotation[]
 
   @@index([status])
   @@index([source])
@@ -89,58 +71,59 @@ model Enquiry {
 }
 
 model EnquiryActivity {
-  id           String   @id @default(cuid())
-  enquiry      Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
-  enquiryId    String
-  activity     String
-  performedBy  String   @default("System")
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  enquiryId   String
+  activity    String
+  performedBy String   @default("System")
+  createdAt   DateTime @default(now())
+  enquiry     Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
 
   @@index([enquiryId])
   @@index([createdAt])
 }
 
 model Customer {
-  id         String      @id @default(cuid())
-  name       String
-  phone      String      @unique
-  email      String?
-  location   String?
-  status     String      @default("Active")
-  enquiryId  String?
-  enquiries  Enquiry[]
-  quotations Quotation[]
-  projects   Project[]
-  invoices   Invoice[]
-  timeline   CustomerTimeline[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id                     String                   @id @default(cuid())
+  name                   String
+  phone                  String                   @unique
+  email                  String?
+  location               String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  enquiryId              String?
+  status                 String                   @default("Active")
+  CustomerContactHistory CustomerContactHistory[]
+  timeline               CustomerTimeline[]
+  enquiries              Enquiry[]
+  invoices               Invoice[]
+  projects               Project[]
+  quotations             Quotation[]
 
   @@index([phone])
   @@index([enquiryId])
 }
 
 model Invoice {
-  id            String    @id @default(cuid())
-  invoiceNumber String    @unique
-  customerId    String?
-  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  customerName  String?
-  projectId     String?
-  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  status        String    @default("Draft")
-  issueDate     DateTime  @default(now())
-  dueDate       DateTime?
-  subtotal      Float     @default(0)
-  discountPercent Float    @default(0)
-  discountAmount Float     @default(0)
-  taxPercent    Float     @default(0)
-  taxAmount     Float     @default(0)
-  totalAmount   Float     @default(0)
-  notes         String?
-  items         InvoiceItem[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  customerId      String?
+  customerName    String?
+  projectId       String?
+  status          String        @default("Draft")
+  issueDate       DateTime      @default(now())
+  dueDate         DateTime?
+  subtotal        Float         @default(0)
+  taxAmount       Float         @default(0)
+  totalAmount     Float         @default(0)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  discountAmount  Float         @default(0)
+  discountPercent Float         @default(0)
+  taxPercent      Float         @default(0)
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  project         Project?      @relation(fields: [projectId], references: [id])
+  items           InvoiceItem[]
 
   @@index([customerId])
   @@index([projectId])
@@ -150,7 +133,6 @@ model Invoice {
 
 model InvoiceItem {
   id          String   @id @default(cuid())
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   invoiceId   String
   description String
   quantity    Float    @default(1)
@@ -158,6 +140,7 @@ model InvoiceItem {
   amount      Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
 }
@@ -165,15 +148,13 @@ model InvoiceItem {
 model CustomerTimeline {
   id          String   @id @default(cuid())
   customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
   eventType   String
   title       String
   description String?
   source      String   @default("SYSTEM")
   createdBy   String?
-
   createdAt   DateTime @default(now())
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([createdAt])
@@ -188,10 +169,10 @@ model Labour {
   status      String   @default("ACTIVE")
   joiningDate DateTime @default(now())
   notes       String?
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([role])
@@ -202,7 +183,6 @@ model Labour {
 model Material {
   id           String   @id @default(cuid())
   projectId    String
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   materialName String
   category     String?
   quantity     Float
@@ -213,47 +193,41 @@ model Material {
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([materialName])
 }
 
-// Project model for project management
 model Project {
-  id               String    @id @default(cuid())
-  title            String
-  description      String?
-  category         String?
-  status           String    @default("Planning")
-  projectType      String?
-  siteAddress      String?
-  startDate        DateTime?
-  expectedEndDate  DateTime?
-  estimatedBudget  String?
-  projectManager   String?
-  customerId       String?
-  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-
-  images String?
-  videos String?
-
-  location String?
-
-  completionDate DateTime?
-  clientName     String?
-
-  featured Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  timelines ProjectTimeline[]
-  documents ProjectDocument[]
-  payments  ProjectPayment[]
-  labours   Labour[]
-  materials Material[]
-  invoices  Invoice[]
+  id              String            @id @default(cuid())
+  title           String
+  description     String?
+  category        String?
+  status          String            @default("Planning")
+  images          String?
+  videos          String?
+  location        String?
+  completionDate  DateTime?
+  clientName      String?
+  featured        Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  customerId      String?
+  estimatedBudget String?
+  expectedEndDate DateTime?
+  projectManager  String?
+  projectType     String?
+  siteAddress     String?
+  startDate       DateTime?
+  invoices        Invoice[]
+  labours         Labour[]
+  materials       Material[]
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+  documents       ProjectDocument[]
+  payments        ProjectPayment[]
   progressHistory ProjectProgress[]
+  timelines       ProjectTimeline[]
 
   @@index([customerId])
   @@index([status])
@@ -262,15 +236,13 @@ model Project {
 model ProjectProgress {
   id         String   @id @default(cuid())
   projectId  String
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
   stage      String
   percentage Int
   notes      String?
-
   updatedBy  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([createdAt])
@@ -278,16 +250,16 @@ model ProjectProgress {
 
 model ProjectPayment {
   id              String      @id @default(cuid())
-  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId       String
   paymentDate     DateTime
   amount          Float
   paymentMode     String
-  paymentType     PaymentType @default(Other)
   referenceNumber String?
   notes           String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  paymentType     PaymentType @default(Other)
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([paymentDate])
@@ -295,25 +267,23 @@ model ProjectPayment {
 
 model ProjectDocument {
   id           String   @id @default(cuid())
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId    String
   fileName     String
   originalName String
   fileUrl      String
   fileType     String?
-  category     String?
   fileSize     Int?
   uploadedBy   String?
   createdAt    DateTime @default(now())
+  category     String?
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([createdAt])
 }
 
-// ProjectTimeline model for project timelines/events
 model ProjectTimeline {
   id          String   @id @default(cuid())
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
   title       String
   description String?
@@ -321,12 +291,12 @@ model ProjectTimeline {
   createdBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([createdAt])
 }
 
-// Blog model for CMS-style blog management
 model Blog {
   id              String    @id @default(cuid())
   title           String
@@ -351,7 +321,6 @@ model Blog {
   @@index([featured])
 }
 
-// Service model for services management
 model Service {
   id                  String   @id @default(cuid())
   serviceName         String
@@ -371,7 +340,6 @@ model Service {
   @@index([featured])
 }
 
-// Testimonial model for customer reviews management
 model Testimonial {
   id               String   @id @default(cuid())
   customerName     String
@@ -395,7 +363,6 @@ model Testimonial {
   @@index([createdAt])
 }
 
-// Analytics model for visitor tracking
 model Analytics {
   id     String   @id @default(cuid())
   page   String
@@ -406,7 +373,6 @@ model Analytics {
   @@index([date])
 }
 
-// Settings model for site configuration
 model Settings {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -417,16 +383,15 @@ model Settings {
   @@index([key])
 }
 
-// EmailLog model for tracking email activity
 model EmailLog {
   id        String   @id @default(cuid())
   toEmail   String
   subject   String
-  type      String // 'customer_acknowledgement', 'admin_notification', 'otp', etc.
-  status    String // 'sent', 'failed', 'pending'
+  type      String
+  status    String
   error     String?
   enquiryId String?
-  metadata  String? // JSON string for additional data
+  metadata  String?
   createdAt DateTime @default(now())
 
   @@index([toEmail])
@@ -435,14 +400,9 @@ model EmailLog {
   @@index([createdAt])
 }
 
-// Quotation model for admin quotations
 model Quotation {
-  id                String   @id @default(cuid())
-  quotationNumber   String   @unique
-  enquiryId         String?
-  enquiry           Enquiry? @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
-  customerId        String?
-  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  id                String                  @id @default(cuid())
+  quotationNumber   String                  @unique
   customerName      String
   customerPhone     String
   customerEmail     String
@@ -458,39 +418,39 @@ model Quotation {
   builtUpArea       String?
   floors            Int?
   estimatedDuration String?
-  status            String   @default("Draft")
+  status            String                  @default("Draft")
   services          String?
   boq               String?
   paymentSchedule   String?
   terms             String?
   notes             String?
   attachments       String?
-  subtotal          Float?   @default(0)
-  gstTotal          Float?   @default(0)
-  discount          Float?   @default(0)
-  grandTotal        Float?   @default(0)
-  isDraft           Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Structured relations (new) — kept additive to avoid breaking existing JSON usage
-  items           QuotationItem[]
-  materials       QuotationMaterial[]
-  paymentStages   QuotationPaymentStage[]
-  warranties      QuotationWarranty[]
-  termsList       QuotationTerm[]
-  attachmentsList QuotationAttachment[]
-  histories       QuotationHistory[]
+  subtotal          Float?                  @default(0)
+  gstTotal          Float?                  @default(0)
+  discount          Float?                  @default(0)
+  grandTotal        Float?                  @default(0)
+  isDraft           Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  enquiryId         String?
+  customerId        String?
+  customer          Customer?               @relation(fields: [customerId], references: [id])
+  enquiry           Enquiry?                @relation(fields: [enquiryId], references: [id])
+  attachmentsList   QuotationAttachment[]
+  histories         QuotationHistory[]
+  items             QuotationItem[]
+  materials         QuotationMaterial[]
+  paymentStages     QuotationPaymentStage[]
+  termsList         QuotationTerm[]
+  warranties        QuotationWarranty[]
 
   @@index([status])
   @@index([createdAt])
   @@index([enquiryId])
 }
 
-// Detailed items for BOQ (structured)
 model QuotationItem {
   id          String    @id @default(cuid())
-  quotation   Quotation @relation(fields: [quotationId], references: [id])
   quotationId String
   sno         Int?
   description String
@@ -502,13 +462,13 @@ model QuotationItem {
   amount      Float     @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
 }
 
 model QuotationMaterial {
   id            String    @id @default(cuid())
-  quotation     Quotation @relation(fields: [quotationId], references: [id])
   quotationId   String
   material      String
   brand         String?
@@ -518,24 +478,24 @@ model QuotationMaterial {
   remarks       String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  quotation     Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
 }
 
 model QuotationTerm {
   id          String    @id @default(cuid())
-  quotation   Quotation @relation(fields: [quotationId], references: [id])
   quotationId String
   order       Int?
   text        String
   createdAt   DateTime  @default(now())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
 }
 
 model QuotationAttachment {
   id           String    @id @default(cuid())
-  quotation    Quotation @relation(fields: [quotationId], references: [id])
   quotationId  String
   fileName     String
   originalName String?
@@ -543,53 +503,53 @@ model QuotationAttachment {
   mimeType     String?
   fileSize     Int?
   createdAt    DateTime  @default(now())
+  quotation    Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
 }
 
 model QuotationPaymentStage {
   id          String    @id @default(cuid())
-  quotation   Quotation @relation(fields: [quotationId], references: [id])
   quotationId String
   order       Int?
   title       String
   percent     Float     @default(0)
   createdAt   DateTime  @default(now())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
 }
 
 model QuotationWarranty {
   id          String    @id @default(cuid())
-  quotation   Quotation @relation(fields: [quotationId], references: [id])
   quotationId String
   years       Int?
   description String
   createdAt   DateTime  @default(now())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
 }
 
 model QuotationHistory {
   id          String    @id @default(cuid())
-  quotation   Quotation @relation(fields: [quotationId], references: [id])
   quotationId String
   adminName   String?
   action      String
   meta        String?
   ipAddress   String?
   createdAt   DateTime  @default(now())
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
 
   @@index([quotationId])
   @@index([action])
 }
 
-// Media model for file uploads
 model Media {
   id           String   @id @default(cuid())
   fileName     String
   originalName String
-  fileType     String // 'image' or 'video'
+  fileType     String
   mimeType     String
   fileSize     Int
   fileUrl      String
@@ -599,12 +559,11 @@ model Media {
   @@index([uploadedAt])
 }
 
-// Notification model for admin notifications
 model Notification {
   id        String   @id @default(cuid())
   title     String
   message   String
-  type      String // 'success', 'warning', 'info', 'error'
+  type      String
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
@@ -613,7 +572,6 @@ model Notification {
   @@index([createdAt])
 }
 
-// ActivityLog model for tracking admin actions
 model ActivityLog {
   id        String   @id @default(cuid())
   adminName String
@@ -626,4 +584,29 @@ model ActivityLog {
   @@index([module])
   @@index([createdAt])
   @@index([adminName])
+}
+
+model CustomerContactHistory {
+  id          String   @id
+  customerId  String
+  type        String
+  title       String
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  Customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([customerId])
+}
+
+enum PaymentType {
+  Advance
+  FirstInstallment
+  SecondInstallment
+  ThirdInstallment
+  FinalPayment
+  ExtraWork
+  Refund
+  Other
 }

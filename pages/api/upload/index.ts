@@ -42,6 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/webm']
     const allowedDocumentTypes = [
       'application/msword',
+      'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

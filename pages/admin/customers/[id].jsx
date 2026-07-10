@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'react-hot-toast'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { ArrowLeft, Loader2, Plus, RefreshCw, MapPin, Box, Wrench, CreditCard, Flag, Users, Phone, MessageSquare, Mail, ReceiptText, FileText, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, RefreshCw, MapPin, Box, Wrench, CreditCard, Flag, Users, Phone, MessageSquare, Mail, ReceiptText, FileText, CalendarDays, Info } from 'lucide-react'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import DashboardCard from '../../../components/admin/DashboardCard'
 
@@ -13,8 +13,6 @@ const tabs = [
   ['quotations', 'Quotations'],
   ['invoices', 'Invoices'],
   ['payments', 'Payments'],
-  ['documents', 'Documents'],
-  ['notes', 'Notes'],
 ]
 
 const emptyStateMessages = {
@@ -23,8 +21,6 @@ const emptyStateMessages = {
   quotations: 'No quotations available.',
   invoices: 'No invoices available.',
   payments: 'No payments available.',
-  documents: 'No documents uploaded.',
-  notes: 'No notes added.',
 }
 
 const statusStyles = {
