@@ -54,6 +54,7 @@ export default function EnquiriesPage() {
       const query = filterStatus ? `?format=${format}&status=${filterStatus}` : `?format=${format}`;
       const response = await fetch(`/api/enquiries/export${query}`);
       
+      // Only Excel export supported
       if (format === 'excel') {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -65,17 +66,6 @@ export default function EnquiriesPage() {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
         toast.success('Exported to Excel successfully');
-      } else if (format === 'pdf') {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `enquiries-${new Date().toISOString().split('T')[0]}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Exported to PDF successfully');
       }
     } catch (error) {
       toast.error('Export failed');
@@ -433,15 +423,7 @@ export default function EnquiriesPage() {
               <FileSpreadsheet className="w-5 h-5" />
               Export Excel
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleExport('pdf')}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
-            >
-              <FileText className="w-5 h-5" />
-              Export PDF
-            </motion.button>
+            {/* PDF export removed - keep Excel only */}
           </div>
         </div>
 

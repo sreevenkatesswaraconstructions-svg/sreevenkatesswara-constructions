@@ -1,7 +1,6 @@
 import { prisma } from '../../../lib/prisma'
 import { NextApiRequest, NextApiResponse } from 'next'
 import * as XLSX from 'xlsx'
-import PDFDocument from 'pdfkit'
 import { format } from 'date-fns'
 import { normalizeEnquiryStatus, normalizeEnquirySource, normalizeEnquiryCreatedBy } from '../../../lib/enquiryUtils'
 
@@ -58,49 +57,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Content-Disposition', `attachment; filename=enquiries-${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
       
       return res.send(buffer)
-    } else if (exportFormat === 'pdf') {
-      // Export to PDF
-      const doc = new PDFDocument({ margin: 50 })
-      const chunks: any[] = []
-
-      doc.on('data', (chunk) => chunks.push(chunk))
-      doc.on('end', () => {
-        const pdfBuffer = Buffer.concat(chunks)
-        res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename=enquiries-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
-        res.send(pdfBuffer)
-      })
-
-      // PDF Header
-      doc.fontSize(20).font('Helvetica-Bold').text('Sree Venkatesswara Constructions & Interiors', { align: 'center' })
-      doc.fontSize(14).font('Helvetica').text('Enquiries Report', { align: 'center' })
-      doc.fontSize(10).text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, { align: 'center' })
-      doc.moveDown()
-
-      // Table Header
-      doc.fontSize(10).font('Helvetica-Bold')
-      doc.text('Name', 50, doc.y)
-      doc.text('Email', 150, doc.y)
-      doc.text('Phone', 300, doc.y)
-      doc.text('Service', 400, doc.y)
-      doc.text('Status', 500, doc.y)
-      doc.moveDown()
-
-      // Table Rows
-      doc.fontSize(9).font('Helvetica')
-      enquiries.forEach((enquiry) => {
-        doc.text(enquiry.customerName, 50, doc.y, { width: 100, ellipsis: true })
-        doc.text(enquiry.email, 150, doc.y, { width: 150, ellipsis: true })
-        doc.text(enquiry.phone, 300, doc.y, { width: 100, ellipsis: true })
-        doc.text(enquiry.service, 400, doc.y, { width: 100, ellipsis: true })
-        doc.text(enquiry.status, 500, doc.y)
-        doc.moveDown()
-      })
-
-      doc.end()
-      
-      // Wait for PDF to finish
-      return new Promise((resolve) => {})
     } else {
       return res.status(400).json({ error: 'Invalid export format' })
     }

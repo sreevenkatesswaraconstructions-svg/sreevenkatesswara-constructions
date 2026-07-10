@@ -19,7 +19,7 @@
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "clsx": "^1.2.1",
-    "date-fns": "^4.3.0",
+    "date-fns": "^2.30.0",
     "formidable": "^3.5.4",
     "framer-motion": "^10.12.16",
     "html2canvas": "^1.4.1",
