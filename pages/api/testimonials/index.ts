@@ -59,7 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status,
         isFeatured,
         displayOrder,
-        adminNotes
+        adminNotes,
+        projectId
       } = req.body
 
       // Public form requirements: customerName, customerLocation, rating, reviewMessage
@@ -83,7 +84,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status: status || 'Pending',
           isFeatured: Boolean(isFeatured),
           displayOrder: Number(displayOrder) || 0,
-          adminNotes: adminNotes?.trim() || null
+          adminNotes: [adminNotes?.trim(), projectId ? `Project reference: ${String(projectId)}` : null]
+            .filter(Boolean)
+            .join(' | ') || null
         }
       })
 

@@ -216,6 +216,82 @@ async function sendEmailWithRetry(
   }
 }
 
+export function getTestimonialRequestEmail(data: {
+  customerName: string;
+  projectName: string;
+  feedbackUrl: string;
+}) {
+  const subject = `Thank you for choosing ${COMPANY_NAME}`;
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${subject}</title>
+      <style>
+        body { font-family: Arial, sans-serif; background: #f3f4f6; margin: 0; padding: 24px; color: #111827; }
+        .card { max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #004d40 0%, #00695c 100%); padding: 28px 32px; color: #ffffff; }
+        .content { padding: 32px; line-height: 1.7; }
+        .button { display: inline-block; margin-top: 16px; padding: 12px 20px; background: #0f766e; color: #ffffff; text-decoration: none; border-radius: 999px; font-weight: 600; }
+        .footer { padding: 24px 32px 32px; font-size: 13px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header">
+          <h1 style="margin:0; font-size:24px;">Thank you for your trust</h1>
+          <p style="margin:8px 0 0; opacity:0.9;">${COMPANY_NAME}</p>
+        </div>
+        <div class="content">
+          <p>Dear ${data.customerName},</p>
+          <p>Thank you for choosing ${COMPANY_NAME} for your project, <strong>${data.projectName}</strong>.</p>
+          <p>We would be grateful if you could share a few words about your experience. Your feedback helps us improve and inspires future customers.</p>
+          <p><a href="${data.feedbackUrl}" class="button">Leave Your Feedback</a></p>
+        </div>
+        <div class="footer">
+          <p>This is an automated message from ${COMPANY_NAME}.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return { subject, html };
+}
+
+export async function sendTestimonialRequestEmail(data: {
+  to: string;
+  customerName: string;
+  projectName: string;
+  projectId: string;
+}) {
+  if (!data.to?.trim()) {
+    return { success: false, error: 'Customer email not provided' };
+  }
+
+  const feedbackUrl = `${company.website.replace(/\/$/, '')}/testimonials/submit?project=${encodeURIComponent(data.projectId)}`;
+  const { subject, html } = getTestimonialRequestEmail({
+    customerName: data.customerName,
+    projectName: data.projectName,
+    feedbackUrl,
+  });
+
+  return sendEmailWithRetry({
+    to: data.to,
+    subject,
+    html,
+    emailType: 'testimonial_request',
+    metadata: {
+      customerName: data.customerName,
+      projectName: data.projectName,
+      projectId: data.projectId,
+      feedbackUrl,
+    },
+  });
+}
+
 // Admin notification email template
 export function getAdminNotificationEmail(data: {
   customerName: string;

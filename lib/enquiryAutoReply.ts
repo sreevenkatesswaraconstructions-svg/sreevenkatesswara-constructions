@@ -220,30 +220,33 @@ export function generateEnquiryReply(enquiry: {
   // Generate personalized email body
   const body = `Dear ${customerName},
 
-Thank you for contacting ${COMPANY_NAME}.
+Thank you for contacting Sree Venkatesswara Constructions.
 
 We have successfully received your enquiry regarding ${service}.
 
-Our team will review your request and contact you shortly with the next steps.
-
-Selected service: ${service}
+Our team is currently reviewing your requirements and will prepare the necessary information before contacting you.
 
 ${serviceResponse.details}
 
 ${location ? `Based on your location (${location}), our team will factor in local requirements and logistics.` : ''}
 
+Summary of your enquiry:
+
+"${message || 'No message provided'}"
+
+${serviceResponse.nextSteps}
+
 We will contact you shortly.
 
-Company details:
+For urgent assistance:
+
 Phone: ${company.primaryPhone}
 Email: ${company.email}
-Address: ${company.address}
 
-Thank you for choosing ${company.name}.
+Regards,
+${company.name}`;
 
-${company.tagline}`;
-
-  const subject = 'Thank You for Contacting Sree Venkatesswara Constructions & Interiors';
+  const subject = 'Your Enquiry Is Under Review – Sree Venkatesswara Constructions';
 
   return { subject, body };
 }
@@ -287,12 +290,6 @@ function generateHTMLEmail(data: {
           color: white;
           padding: 40px 30px;
           text-align: center;
-        }
-        .logo {
-          max-width: 140px;
-          height: auto;
-          margin-bottom: 12px;
-          border-radius: 8px;
         }
         .header h1 {
           margin: 0;
@@ -397,8 +394,8 @@ function generateHTMLEmail(data: {
     <body>
       <div class="container">
         <div class="header">
-          <img class="logo" src="https://www.sreevenkatesswaraconstructions.com/images/logo.jpeg" alt="${COMPANY_NAME} logo" />
-          <h1>${COMPANY_NAME}</h1>
+          <div class="logo">🏗️</div>
+          <h1>Sree Venkatesswara Constructions</h1>
           <p>Constructions & Interiors</p>
         </div>
 
@@ -419,10 +416,9 @@ function generateHTMLEmail(data: {
           </div>
 
           <div class="contact-box">
-            <p><strong>Contact us:</strong></p>
+            <p><strong>For urgent assistance:</strong></p>
             <p>📞 Phone: ${company.primaryPhone}</p>
             <p>📧 Email: <a href="mailto:${company.email}">${company.email}</a></p>
-            <p>📍 Address: ${company.address}</p>
           </div>
 
           ${data.enquiryId ? `
@@ -434,8 +430,8 @@ function generateHTMLEmail(data: {
         </div>
 
         <div class="footer">
-          <h3>${COMPANY_NAME}</h3>
-          <p>${company.tagline}</p>
+          <h3>Sree Venkatesswara Constructions</h3>
+          <p>Building Dreams, Creating Spaces</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             This is an automated email. Please do not reply.
           </p>
@@ -457,11 +453,6 @@ export async function sendEnquiryAcknowledgement(enquiry: {
   location?: string | null;
   message?: string | null;
 }): Promise<{ success: boolean; error?: any }> {
-  if (!enquiry.email?.trim()) {
-    console.log('[AUTO-REPLY] Skipping customer confirmation email because no email address was provided');
-    return { success: false, error: 'Customer email not provided' };
-  }
-
   console.log('[AUTO-REPLY] ==================================');
   console.log('[AUTO-REPLY] Customer:', enquiry.email);
   console.log('[AUTO-REPLY] Service:', enquiry.service);

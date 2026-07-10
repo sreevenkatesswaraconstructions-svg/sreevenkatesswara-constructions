@@ -1,5 +1,6 @@
 import { prisma } from '../../../lib/prisma'
 import { NextApiRequest, NextApiResponse } from 'next'
+import { sendTestimonialRequestEmail } from '../../../lib/email'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query
@@ -51,6 +52,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         customerId,
       } = req.body
 
+      const previousProject = await prisma.project.findUnique({
+        where: { id },
+        select: { status: true }
+      })
+
+      const normalizedPreviousStatus = previousProject?.status?.toString().trim().toLowerCase()
+      const normalizedNewStatus = status !== undefined ? String(status).trim().toLowerCase() : undefined
+      const shouldSendTestimonialRequest = normalizedNewStatus === 'completed' && normalizedPreviousStatus !== 'completed'
+
       const project = await prisma.project.update({
         where: { id },
         data: {
@@ -73,6 +83,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...(featured !== undefined && { featured })
         }
       })
+
+      if (shouldSendTestimonialRequest) {
+        console.log('[TESTIMONIAL] Project completed')
+        try {
+          const enrichedProject = await prisma.project.findUnique({
+            where: { id },
+            include: {
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                }
+              }
+            }
+          })
+
+          const customerEmail = enrichedProject?.customer?.email?.trim()
+
+          if (!customerEmail) {
+            console.log('[TESTIMONIAL] Customer email missing.')
+          } else {
+            console.log('[TESTIMONIAL] Sending testimonial email...')
+            console.log('[TESTIMONIAL] Customer:', customerEmail)
+
+            try {
+              const existingRequestLog = await prisma.emailLog.findFirst({
+                where: {
+                  type: 'testimonial_request',
+                  metadata: {
+                    contains: `"projectId":"${id}"`
+                  }
+                }
+              })
+
+              if (!existingRequestLog) {
+                const result = await sendTestimonialRequestEmail({
+                  to: customerEmail,
+                  customerName: enrichedProject?.customer?.name || 'Valued Customer',
+                  projectName: project.title || 'your project',
+                  projectId: id,
+                })
+
+                console.log('[PROJECT API] Testimonial request email result:', result)
+
+                if (!result?.success) {
+                  console.error('[TESTIMONIAL] Resend error:', result?.error || 'Unknown error')
+                }
+              } else {
+                console.log('[PROJECT API] Skipping duplicate testimonial request email for project:', id)
+              }
+            } catch (sendErr) {
+              console.error('[TESTIMONIAL] Error sending testimonial email:', sendErr)
+              // Do not interrupt project update flow on email errors
+            }
+          }
+        } catch (emailError) {
+          console.error('[PROJECT API] Failed to prepare/send testimonial request email:', emailError)
+        }
+      }
 
       console.log('[PROJECT API] Project updated:', id);
       return res.status(200).json(project)
