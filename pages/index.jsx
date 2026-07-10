@@ -105,42 +105,42 @@ export default function Home(){
           </div>
         </section>
 
-        <section className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] items-center glass-panel p-8 rounded-[2rem] border border-emerald/10 shadow-2xl bg-white/80">
-          <div className="space-y-6">
+        <section className="grid gap-8 md:gap-10 lg:grid-cols-[0.9fr_1.1fr] items-center glass-panel p-6 sm:p-8 rounded-[2rem] border border-emerald/10 shadow-2xl bg-white/80">
+          <div className="space-y-5 sm:space-y-6">
             <p className="text-sm uppercase tracking-[0.35em] text-gold">About Preview</p>
-            <h2 className="text-4xl font-serif text-emerald">Your Vision, Our Commitment</h2>
-            <p className="text-gray-700 leading-relaxed">Sree Venkatesswara Constructions & Interiors blends spiritual elegance with modern luxury to craft spaces rooted in trust, quality and cultural warmth. Our attention to detail ensures each project feels premium and timeless.</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl bg-beige p-6 shadow-inner border border-emerald/10">
+            <h2 className="text-3xl sm:text-4xl font-serif text-emerald leading-tight break-words">Your Vision, Our Commitment</h2>
+            <p className="max-w-2xl text-sm sm:text-base text-gray-700 leading-relaxed break-words">Sree Venkatesswara Constructions & Interiors blends spiritual elegance with modern luxury to craft spaces rooted in trust, quality and cultural warmth. Our attention to detail ensures each project feels premium and timeless.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="w-full rounded-3xl bg-beige p-5 sm:p-6 shadow-inner border border-emerald/10">
                 <h3 className="font-semibold text-emerald mb-2">Quality commitment</h3>
                 <p className="text-sm text-gray-700">Premium finishes, superior materials and strict workmanship standards.</p>
               </div>
-              <div className="rounded-3xl bg-beige p-6 shadow-inner border border-emerald/10">
+              <div className="w-full rounded-3xl bg-beige p-5 sm:p-6 shadow-inner border border-emerald/10">
                 <h3 className="font-semibold text-emerald mb-2">Trust & transparency</h3>
                 <p className="text-sm text-gray-700">Clear budgets, honest timelines and communication at every step.</p>
               </div>
             </div>
           </div>
-          <div className="space-y-6">
+          <div className="w-full space-y-4 sm:space-y-6">
             <ClickableImage
               src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80"
               alt="Architecture"
-              className="h-[360px]"
+              className="w-full h-[220px] sm:h-[280px] lg:h-[360px]"
               aspectRatio="aspect-video"
               rounded="rounded-[2rem]"
             />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ClickableImage
                 src="https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=800&q=80"
                 alt="Interior design"
-                className="h-40"
+                className="w-full h-32 sm:h-40"
                 aspectRatio="aspect-video"
                 rounded="rounded-[1.75rem]"
               />
               <ClickableImage
                 src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=800&q=80"
                 alt="Construction"
-                className="h-40"
+                className="w-full h-32 sm:h-40"
                 aspectRatio="aspect-video"
                 rounded="rounded-[1.75rem]"
               />
