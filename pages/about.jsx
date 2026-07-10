@@ -1,13 +1,5 @@
 import SEO from '../components/SEO'
-import Counter from '../components/Counter'
 import Timeline from '../components/Timeline'
-
-const stats = [
-  { value: 320, label: 'Completed Projects' },
-  { value: 180, label: 'Happy Clients' },
-  { value: 18, label: 'Years of Experience' },
-  { value: 64, label: 'Luxury Builds' }
-]
 
 const journey = [
   { title: 'Rooted in Tradition', desc: 'Founded to merge modern architecture with timeless cultural elegance.' },
@@ -27,7 +19,7 @@ const values = [
 
 export default function About(){
   return (
-    <main className="max-w-7xl mx-auto px-6 py-20 space-y-20">
+    <main className="max-w-7xl mx-auto px-6 py-20 space-y-16 lg:space-y-20">
       <SEO title="About Us — Sree Venkatesswara Constructions & Interiors" description="Discover our premium construction and interior story, vision and values." />
 
       <section className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] items-center">
@@ -57,15 +49,6 @@ export default function About(){
             <img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80" alt="Premium interior" className="w-full object-cover h-[320px]" />
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-8 lg:grid-cols-4">
-        {stats.map(stat => (
-          <div key={stat.label} className="glass-panel rounded-[2rem] border border-emerald/10 p-8 text-center shadow-xl">
-            <p className="text-5xl font-serif text-emerald">{stat.value}+</p>
-            <p className="mt-3 uppercase tracking-[0.28em] text-sm text-gray-600">{stat.label}</p>
-          </div>
-        ))}
       </section>
 
       <section className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] items-start">
