@@ -572,11 +572,12 @@ export default function QuotationBuilder({ quotationId }){
       if (!liveData.boq || liveData.boq.length===0) { if (showMessage) toast.error('At least one BOQ item required'); return false }
     }
 
-    const payload = {
-      ...liveData,
-      customerId: liveData.customerId || customerIdFromQuery || null,
-      enquiryId: liveData.enquiryId || enquiryIdFromQuery || null,
-    }
+   const payload = {
+  ...liveData,
+  status: normalizedStatus,
+  customerId: liveData.customerId || customerIdFromQuery || null,
+  enquiryId: liveData.enquiryId || enquiryIdFromQuery || null,
+}
     // Log payload for debugging status-saving issues
     let toastId = null
     setSaveLoading(true)
@@ -611,10 +612,18 @@ export default function QuotationBuilder({ quotationId }){
 
       if (toastId) toast.dismiss(toastId)
       if (showMessage) {
-        toast.success('Quotation saved successfully.')
-      }
+  toast.success(
+    normalizedStatus === 'Sent'
+      ? 'Quotation marked as Sent.'
+      : 'Draft saved successfully.'
+  )
+}
 
-      return true
+if (normalizedStatus === 'Draft' || normalizedStatus === 'Sent') {
+  router.push('/admin/quotations')
+}
+
+return true
     } catch(err){
       console.error('Save error:', err)
       if (toastId) toast.dismiss(toastId)
@@ -988,13 +997,54 @@ export default function QuotationBuilder({ quotationId }){
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={downloadPdf} disabled={downloadLoading} className="px-4 py-2 border rounded inline-flex items-center gap-2">
-                <Download className="w-4 h-4" /> {downloadLoading ? 'Generating...' : 'Download PDF'}
-              </button>
-              <button type="button" onClick={handlePrint} className="px-4 py-2 border rounded inline-flex items-center gap-2"><Printer /> Print</button>
-            </div>
-          </div>
+           <div className="flex gap-2 flex-wrap">
+  <button
+    type="button"
+    onClick={handlePreview}
+    className="px-4 py-2 bg-blue-600 text-white rounded inline-flex items-center gap-2 hover:bg-blue-700"
+  >
+    <FileText className="w-4 h-4" />
+    Preview
+  </button>
+
+  <button
+    type="button"
+    onClick={() => handleSave('Draft')}
+    disabled={saveLoading}
+    className="px-4 py-2 bg-green-600 text-white rounded inline-flex items-center gap-2 hover:bg-green-700"
+  >
+    Save Draft
+  </button>
+
+  <button
+    type="button"
+    onClick={handleSaveAndSend}
+    disabled={saveLoading}
+    className="px-4 py-2 bg-purple-600 text-white rounded inline-flex items-center gap-2 hover:bg-purple-700"
+  >
+    Send
+  </button>
+
+  <button
+    type="button"
+    onClick={downloadPdf}
+    disabled={downloadLoading}
+    className="px-4 py-2 border rounded inline-flex items-center gap-2"
+  >
+    <Download className="w-4 h-4" />
+    {downloadLoading ? 'Generating...' : 'Download PDF'}
+  </button>
+
+  <button
+    type="button"
+    onClick={handlePrint}
+    className="px-4 py-2 border rounded inline-flex items-center gap-2"
+  >
+    <Printer className="w-4 h-4" />
+    Print
+  </button>
+</div>
+</div>
           {showPreview ? (
             <div className="bg-gray-50 border border-gray-200 rounded p-4">
               <div className="flex items-center justify-between mb-3">
