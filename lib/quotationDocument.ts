@@ -360,15 +360,86 @@ export const buildQuotationHtml = (
       <div class="section-box">
         <h4>Signatures</h4>
         <div class="signatures-grid">
-          <div class="signature-box">
-            <div class="label">Prepared By</div>
-            <div class="signature-name">${escapeHtml(companyName || 'Sree Venkateswara')}</div>
-            <div class="signature-subtitle">${escapeHtml(companyTagline || 'Constructions & Interiors')}</div>
-          </div>
-          <div class="signature-box">
-            <div class="label">Authorized Signature</div>
-            <div class="signature-line"></div>
-          </div>
+          <div
+  class="signature-box"
+  style="
+    position:relative;
+    overflow:hidden;
+  "
+>
+  <img
+    src="/images/stamps/company-stamp.png"
+    alt="Company Stamp"
+    style="
+      position: absolute;
+width: 220px;
+opacity: 0.60;
+left: 50%;
+top: 50%;
+transform: translate(-50%, -50%);
+pointer-events: none;
+user-select: none;
+    "
+  />
+
+  <div class="label" style="position:relative;z-index:2;">
+    Prepared By
+  </div>
+
+  <div class="signature-name" style="position:relative;z-index:2;">
+    ${escapeHtml(companyName || 'Sree Venkateswara')}
+  </div>
+
+  <div class="signature-subtitle" style="position:relative;z-index:2;">
+    ${escapeHtml(companyTagline || 'Constructions & Interiors')}
+  </div>
+</div>
+       <div class="signature-box">
+  <div class="label">Authorized Signature</div>
+
+  <div
+    style="
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    "
+  >
+    <img
+      src="/images/signatures/authorized-signature.png"
+      alt="Authorized Signature"
+      style="
+  width:220px;
+  height:45px;
+margin-bottom:-8px;
+  object-fit:contain;
+  display:block;
+  margin:0 auto;
+"
+    />
+  </div>
+
+  <div
+  style="
+    border-top:1px solid #64748b;
+    margin-top:0;
+    padding-top:6px;
+    text-align:center;
+  "
+>
+    <div
+  style="
+    font-size:11px;
+    color:#475569;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+  "
+>
+  Authorized Signatory
+</div>
+  </div>
+</div>
           <div class="signature-box">
             <div class="label">Customer Signature</div>
             <div class="signature-line"></div>
@@ -451,7 +522,18 @@ export const buildQuotationHtml = (
         .summary-grid .grand-label { font-weight: 700; }
         .summary-grid .grand-value { font-weight: 700; }
         .signatures-grid { display: flex; gap: 12px; flex-wrap: nowrap; }
-        .signature-box { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; min-height: 100px; background: #fafafa; overflow: visible; }
+        .signature-box {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #ffffff;
+  min-height: 135px;
+  box-sizing: border-box;
+}
         .signature-name { margin-top: 12px; font-weight: 700; font-size: 13px; color: #0f172a; }
         .signature-subtitle { margin-top: 4px; font-size: 11px; color: #475569; line-height: 1.4; }
         .signature-line { margin-top: 12px; min-height: 28px; border-bottom: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; }
