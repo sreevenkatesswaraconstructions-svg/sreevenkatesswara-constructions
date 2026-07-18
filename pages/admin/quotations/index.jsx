@@ -73,7 +73,9 @@ export default function QuotationsList() {
                 <td>{it.quotationNumber}<div className="text-sm text-gray-500">{it.projectName}</div></td>
                 <td>{it.customerName}<div className="text-sm text-gray-500">{it.customerPhone}</div></td>
                 <td>{it.status}</td>
-                <td>{new Date(it.createdAt).toLocaleDateString()}</td>
+                <td>
+  {new Date(it.quotationDate || it.createdAt).toLocaleDateString()}
+</td>
                 <td className="flex gap-2">
                   <Link href={`/admin/quotations/${it.id}`} className="p-2 rounded hover:bg-gray-100"><Eye className="w-4 h-4" /></Link>
                   <Link href={`/admin/quotations/${it.id}`} className="p-2 rounded hover:bg-gray-100"><Edit className="w-4 h-4" /></Link>

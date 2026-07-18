@@ -139,6 +139,7 @@ export const serializeQuotationPayload = async (input: QuotationPayload = {}, op
     referenceBy: String(input?.referenceBy ?? '').trim() || null,
     projectName: String(input?.projectName ?? '').trim(),
     projectType: String(input?.projectType ?? '').trim(),
+    quotationDate: input?.quotationDate ? new Date(input.quotationDate) : null,
     projectLocation: String(input?.projectLocation ?? '').trim() || null,
     plotArea: String(input?.plotArea ?? '').trim() || null,
     builtUpArea: String(input?.builtUpArea ?? '').trim() || null,

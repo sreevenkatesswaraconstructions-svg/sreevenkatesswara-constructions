@@ -130,7 +130,15 @@ export const buildQuotationHtml = (
   const gstNumber = escapeHtml(settings.gst_number || settings.gstNumber || '')
 
   const quotationNumber = escapeHtml(quotation.quotationNumber || quotation.quotation_number || `SVC-${new Date().getFullYear()}-0000`)
-  const quotationDate = escapeHtml(formatDate(quotation.createdAt || quotation.created_at || quotation.date))
+  const quotationDate = escapeHtml(
+  formatDate(
+    quotation.quotationDate ||
+    quotation.quotation_date ||
+    quotation.createdAt ||
+    quotation.created_at ||
+    quotation.date
+  )
+)
   const generatedDate = escapeHtml(formatDate(new Date()))
 
   const customerDetailsRows = [

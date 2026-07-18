@@ -21,7 +21,9 @@ export default function QuotationBuilder({ quotationId }){
       ? router.query.customerId[0]
       : null
 
-  const [data, setData] = useState({ boq: [], paymentSchedule: [], terms: DEFAULT_QUOTATION_TERMS, notes: DEFAULT_QUOTATION_NOTES, attachments: [], subtotal:0, gstTotal:0, gstPercent:0, discount:0, discountPercent:0, subtotalAfterDiscount:0, grandTotal:0 })
+  const [data, setData] = useState({
+  quotationDate: new Date().toISOString().split('T')[0],
+  boq: [], paymentSchedule: [], terms: DEFAULT_QUOTATION_TERMS, notes: DEFAULT_QUOTATION_NOTES, attachments: [], subtotal:0, gstTotal:0, gstPercent:0, discount:0, discountPercent:0, subtotalAfterDiscount:0, grandTotal:0 })
   const [customProjectTypeEnabled, setCustomProjectTypeEnabled] = useState(false)
   const projectTypeOptions = ['Individual House','Duplex House','Luxury Villa','Apartment','Commercial Building','Office Interior','Shop Interior','Renovation','Turnkey Construction','Interior Design']
   const [settings, setSettings] = useState({})
@@ -244,12 +246,17 @@ export default function QuotationBuilder({ quotationId }){
           if (d && d.success && mounted){
             const loadedBoq = Array.isArray(d.data?.boq) ? d.data.boq : []
             setData(prev => ({
-              ...prev,
-              ...(d.data || {}),
-              boq: loadedBoq,
-              terms: Array.isArray(d.data?.terms) ? d.data.terms : [],
-              notes: String(d.data?.notes || ''),
-            }))
+  ...prev,
+  ...(d.data || {}),
+
+  quotationDate: d.data?.quotationDate
+    ? String(d.data.quotationDate).split("T")[0]
+    : "",
+
+  boq: loadedBoq,
+  terms: Array.isArray(d.data?.terms) ? d.data.terms : [],
+  notes: String(d.data?.notes || ""),
+}))
             setWorkBlocks(buildWorkBlocksFromBoq(loadedBoq))
             setCurrentId(quotationId)
           }
@@ -541,13 +548,19 @@ export default function QuotationBuilder({ quotationId }){
 
       const loadedBoq = Array.isArray(d.data?.boq) ? d.data.boq : []
       setCurrentId(idToLoad)
-      setData(prev => ({
-        ...prev,
-        ...d.data,
-        boq: loadedBoq,
-        terms: Array.isArray(d.data?.terms) ? d.data.terms : prev.terms,
-        notes: String(d.data?.notes || prev.notes || ''),
-      }))
+    setData(prev => {
+
+  return {
+    ...prev,
+    ...(d.data || {}),
+    quotationDate: d.data?.quotationDate
+      ? new Date(d.data.quotationDate).toISOString().split("T")[0]
+      : "",
+    boq: loadedBoq,
+    terms: Array.isArray(d.data?.terms) ? d.data.terms : [],
+    notes: String(d.data?.notes || ""),
+  };
+});
       setWorkBlocks(buildWorkBlocksFromBoq(loadedBoq))
       return d.data
     } catch (err) {
@@ -601,6 +614,7 @@ export default function QuotationBuilder({ quotationId }){
           setData(prev => ({
             ...prev,
             ...d.data,
+            
             terms: Array.isArray(d.data?.terms) ? d.data.terms : prev.terms,
             notes: String(d.data?.notes ?? prev.notes ?? ''),
           }))
@@ -684,6 +698,18 @@ return true
         <div className="bg-white p-4 rounded">
           <h3 className="font-semibold mb-2">Section 2 — Project Information</h3>
           <div className="grid grid-cols-2 gap-3">
+            <div>
+  <label className="block text-sm font-medium mb-1">
+    Quotation Date
+  </label>
+
+  <input
+    type="date"
+    value={data.quotationDate || ''}
+    onChange={(e) => setField('quotationDate', e.target.value)}
+    className="border p-2 rounded w-full"
+  />
+</div>
             <input value={data.projectName} onChange={(e)=>setField('projectName', e.target.value)} placeholder="Project Name *" className={"border p-2 rounded " + (validationErrors.projectName ? 'border-red-500' : '')} />
             <div className="space-y-2">
               <select value={customProjectTypeEnabled ? 'Others' : (data.projectType || '')} onChange={(e)=>handleProjectTypeChange(e.target.value)} className="border p-2 rounded w-full">
