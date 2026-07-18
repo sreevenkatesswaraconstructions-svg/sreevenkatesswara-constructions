@@ -485,6 +485,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const signatureX = left + pageWidth - 160
 
     doc.font('Helvetica').fontSize(9).fillColor('#64748b')
+    const fs = require('fs')
+const path = require('path')
+
+const stampPath = path.join(process.cwd(), 'public', 'images', 'stamps', 'company-stamp.png')
+const signaturePath = path.join(process.cwd(), 'public', 'images', 'signatures', 'authorized-signature.png')
+if (fs.existsSync(stampPath)) {
+  doc.opacity(0.30)
+doc.image(stampPath, signatureX + 5, signatureAreaTop - 10, {
+  width: 95
+})
+  doc.opacity(1)
+}
+if (fs.existsSync(signaturePath)) {
+  doc.image(signaturePath, signatureX + 2, signatureAreaTop - 2, {
+  width: 115
+})
+}
     doc.text('Authorized Signature', signatureX, signatureAreaTop, { width: 150, align: 'left' })
     doc.moveTo(signatureX, signatureAreaTop + 28).lineTo(signatureX + 140, signatureAreaTop + 28).strokeColor('#cbd5e1').lineWidth(1).stroke()
 
