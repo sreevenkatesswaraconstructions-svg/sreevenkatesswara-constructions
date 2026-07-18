@@ -1085,7 +1085,12 @@ return true
                   ref={previewIframeRef}
                   title="Quotation Preview"
                   srcDoc={getQuotationHtml()}
-                  style={{ width: '210mm', height: '297mm', border: '1px solid #d1d5db', borderRadius: 10 }}
+                  style={{
+  width: '100%',
+  height: '90vh',
+  border: '1px solid #d1d5db',
+  borderRadius: 10,
+}}
                 />
               </div>
             </div>

@@ -459,6 +459,21 @@ export const buildQuotationHtml = (
         .content-area { min-height: 1px; }
         .section-card, .section-box { break-inside: avoid-page; page-break-inside: avoid; }
         @media print {
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    width: 210mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
           body { padding: 0; background: white; }
           .paper { width: 100%; }
           .page { margin: 0; box-shadow: none; }
